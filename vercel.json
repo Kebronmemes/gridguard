@@ -1,8 +1,2 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/eeu-sync",
-      "schedule": "0 */6 * * *"
-    }
-  ]
 }
