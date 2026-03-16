@@ -54,10 +54,15 @@ export default function AnalyticsDashboard() {
   }
 
   function getTimeData() {
-    if (timeRange === '24h') return { labels: data!.hourlyData.map(d => d.hour), values: data!.hourlyData.map(d => d.count) };
-    if (timeRange === 'week') return { labels: data!.dailyData.map(d => d.day), values: data!.dailyData.map(d => d.count) };
-    if (timeRange === 'month') return { labels: data!.weeklyData.map(d => d.week), values: data!.weeklyData.map(d => d.count) };
-    return { labels: data!.monthlyData.map(d => d.month), values: data!.monthlyData.map(d => d.count) };
+    const hourly = Array.isArray(data?.hourlyData) ? data.hourlyData : [];
+    const daily = Array.isArray(data?.dailyData) ? data.dailyData : [];
+    const weekly = Array.isArray(data?.weeklyData) ? data.weeklyData : [];
+    const monthly = Array.isArray(data?.monthlyData) ? data.monthlyData : [];
+
+    if (timeRange === '24h') return { labels: hourly.map(d => d.hour), values: hourly.map(d => d.count) };
+    if (timeRange === 'week') return { labels: daily.map(d => d.day), values: daily.map(d => d.count) };
+    if (timeRange === 'month') return { labels: weekly.map(d => d.week), values: weekly.map(d => d.count) };
+    return { labels: monthly.map(d => d.month), values: monthly.map(d => d.count) };
   }
 
   const td = getTimeData();
@@ -79,13 +84,18 @@ export default function AnalyticsDashboard() {
   const severityData = {
     labels: ['Low', 'Moderate', 'Critical', 'Grid Failure'],
     datasets: [{
-      data: [data.outagesBySeverity.low, data.outagesBySeverity.moderate, data.outagesBySeverity.critical, data.outagesBySeverity.grid_failure],
+      data: [
+        data?.outagesBySeverity?.low || 0,
+        data?.outagesBySeverity?.moderate || 0,
+        data?.outagesBySeverity?.critical || 0,
+        data?.outagesBySeverity?.grid_failure || 0
+      ],
       backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#7c2d12'],
       borderWidth: 0,
     }],
   };
 
-  const topAreas = Object.entries(data.outagesByArea).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const topAreas = Object.entries(data?.outagesByArea || {}).sort((a, b) => b[1] - a[1]).slice(0, 8);
   const areaData = {
     labels: topAreas.map(a => a[0]),
     datasets: [{
@@ -153,33 +163,33 @@ export default function AnalyticsDashboard() {
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-slate-400">Grid Reliability</span>
-                <span className="text-white font-bold">{data.gridReliability.toFixed(1)}%</span>
+                <span className="text-white font-bold">{(data?.gridReliability || 100).toFixed(1)}%</span>
               </div>
               <div className="w-full bg-slate-700 rounded-full h-2">
-                <div className="bg-green-500 h-2 rounded-full transition-all duration-1000" style={{ width: `${data.gridReliability}%` }} />
+                <div className="bg-green-500 h-2 rounded-full transition-all duration-1000" style={{ width: `${data?.gridReliability || 100}%` }} />
               </div>
             </div>
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-slate-400">Avg. Restoration</span>
-                <span className="text-white font-bold">{(data.averageRestorationMinutes / 60).toFixed(1)}h</span>
+                <span className="text-white font-bold">{((data?.averageRestorationMinutes || 0) / 60).toFixed(1)}h</span>
               </div>
               <div className="w-full bg-slate-700 rounded-full h-2">
-                <div className="bg-blue-500 h-2 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, 100 - data.averageRestorationMinutes / 10)}%` }} />
+                <div className="bg-blue-500 h-2 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, 100 - (data?.averageRestorationMinutes || 0) / 10)}%` }} />
               </div>
             </div>
             <div className="pt-3 border-t border-slate-700 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-400">Active Outages</span>
-                <span className="text-red-400 font-bold">{data.activeOutages}</span>
+                <span className="text-red-400 font-bold">{data?.activeOutages || 0}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-400">Resolved Today</span>
-                <span className="text-green-400 font-bold">{data.resolvedToday}</span>
+                <span className="text-green-400 font-bold">{data?.resolvedToday || 0}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-400">Total Historical</span>
-                <span className="text-slate-300 font-bold">{data.totalOutages}</span>
+                <span className="text-slate-300 font-bold">{data?.totalOutages || 0}</span>
               </div>
             </div>
           </div>
