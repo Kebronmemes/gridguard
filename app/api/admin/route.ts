@@ -27,7 +27,9 @@ export async function GET(request: Request) {
     { count: contentCount },
     { data: recentFeed },
     { data: rawSubscriptions },
-    { data: staffLocationsData }
+    { data: staffLocationsData },
+    { data: eeuRawData },
+    { data: citizenReports }
   ] = await Promise.all([
     supabase.from('staff_users').select('*', { count: 'exact', head: true }),
     supabase.from('district_history').select('*', { count: 'exact', head: true }).is('end_time', null),
@@ -36,13 +38,41 @@ export async function GET(request: Request) {
     supabase.from('blog_content').select('*', { count: 'exact', head: true }),
     supabase.from('system_feed').select('*').order('timestamp', { ascending: false }).limit(20),
     supabase.from('subscribers').select('*').order('created_at', { ascending: false }).limit(50),
-    supabase.from('staff_locations').select('*')
+    supabase.from('staff_locations').select('*'),
+    supabase.from('district_history').select('*').order('start_time', { ascending: false }).limit(50),
+    supabase.from('citizen_reports').select('*').order('created_at', { ascending: false }).limit(200)
   ]);
 
   const staffLocations = staffLocationsData?.reduce((acc: any, row) => {
     acc[row.staff_id] = { lat: row.lat, lng: row.lng, updatedAt: row.updated_at };
     return acc;
   }, {}) || {};
+
+  // Build EEU data for the admin page
+  const eeuData = (eeuRawData || []).map((row: any) => ({
+    id: row.id,
+    subcity: row.subcity || row.area || 'Unknown',
+    district: row.district || '',
+    reason: row.reason || 'Scheduled maintenance',
+    active: !row.end_time,
+    fetchedAt: row.start_time || row.created_at,
+    translatedFrom: row.translated_from || null,
+  }));
+
+  // Build report clusters grouped by area
+  const reportClusters: Record<string, { count: number; priority: string }> = {};
+  for (const report of (citizenReports || [])) {
+    const area = report.area || report.location || 'Unknown';
+    if (!reportClusters[area]) {
+      reportClusters[area] = { count: 0, priority: 'low' };
+    }
+    reportClusters[area].count++;
+  }
+  // Assign priority based on count
+  for (const area of Object.keys(reportClusters)) {
+    const c = reportClusters[area].count;
+    reportClusters[area].priority = c >= 10 ? 'critical' : c >= 5 ? 'high' : c >= 3 ? 'medium' : 'low';
+  }
 
   return NextResponse.json({
     stats: {
@@ -51,11 +81,13 @@ export async function GET(request: Request) {
       totalReports: totalReports || 0,
       totalSubscribers: totalSubs || 0,
       contentItems: contentCount || 0,
-      eeuInterruptions: 0, // Managed via district_history going forward
+      eeuInterruptions: eeuData.length,
     },
     staffLocations,
     recentFeed: recentFeed || [],
-    rawSubscriptions: rawSubscriptions || []
+    rawSubscriptions: rawSubscriptions || [],
+    eeuData,
+    reportClusters,
   });
 }
 

@@ -244,7 +244,7 @@ export default function AdminDashboard() {
                 <Globe className="w-4 h-4" /> Run EEU Crawler Now
               </button>
               <div className="space-y-3">
-                {data?.eeuData?.map((item: any) => (
+                {(Array.isArray(data?.eeuData) ? data.eeuData : []).map((item: any) => (
                   <div key={item.id} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-semibold text-white">{item.subcity}</h4>
