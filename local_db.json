@@ -1,0 +1,88 @@
+{
+  "outages": [],
+  "resolvedOutages": [],
+  "feed": [
+    {
+      "id": "EEU-BYORT4",
+      "timestamp": "2026-03-15T08:51:31.909Z",
+      "type": "grid_update",
+      "message": "🔐 Staff login: System Admin (admin)",
+      "area": "System"
+    },
+    {
+      "id": "EEU-O4I6WB",
+      "timestamp": "2026-03-15T08:26:40.567Z",
+      "type": "grid_update",
+      "message": "🔐 Staff login: System Admin (admin)",
+      "area": "System"
+    },
+    {
+      "id": "EEU-ZHC76J",
+      "timestamp": "2026-03-15T08:20:19.646Z",
+      "type": "grid_update",
+      "message": "🔐 Staff login: System Admin (admin)",
+      "area": "System"
+    },
+    {
+      "id": "EEU-ZKLYTG",
+      "timestamp": "2026-03-15T07:13:25.547Z",
+      "type": "maintenance_scheduled",
+      "message": "🔧 Maintenance scheduled for Yeka: test — Duration: 2 hours",
+      "area": "Yeka"
+    },
+    {
+      "id": "EEU-T9HNO9",
+      "timestamp": "2026-03-15T07:13:25.544Z",
+      "type": "maintenance_scheduled",
+      "message": "🔧 Maintenance scheduled for Yeka: test — Duration: 2 hours",
+      "area": "Yeka"
+    },
+    {
+      "id": "EEU-YYUFY8",
+      "timestamp": "2026-03-15T07:12:18.271Z",
+      "type": "grid_update",
+      "message": "🔐 Staff login: System Admin (admin)",
+      "area": "System"
+    },
+    {
+      "id": "EEU-C1G7C2",
+      "timestamp": "2026-03-15T07:01:19.815Z",
+      "type": "grid_update",
+      "message": "🔐 Staff login: System Admin (admin)",
+      "area": "System"
+    },
+    {
+      "id": "EEU-QH0315",
+      "timestamp": "2026-03-15T06:53:40.670Z",
+      "type": "grid_update",
+      "message": "🔐 Staff login: System Admin (admin)",
+      "area": "System"
+    }
+  ],
+  "reports": [],
+  "feedbacks": [],
+  "subscriptions": [],
+  "staffUsers": [
+    {
+      "id": "staff-admin",
+      "username": "admin",
+      "passwordHash": "admin123",
+      "name": "System Admin",
+      "role": "admin",
+      "email": "admin@eeu.gov.et",
+      "failedAttempts": 0
+    },
+    {
+      "id": "staff-maint",
+      "username": "maintenance",
+      "passwordHash": "maint123",
+      "name": "Sara Kebede",
+      "role": "maintenance",
+      "email": "maintenance@eeu.gov.et",
+      "failedAttempts": 0
+    }
+  ],
+  "eeuInterruptions": [],
+  "content": [],
+  "staffLocationsMap": {}
+}

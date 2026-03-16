@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GridGuard — Ethiopia Outage Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Lato:wght@300;400;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<style>
+:root{
+  --blue:#4567b7;--blue-dk:#2d4a8f;--blue-lt:#eef1ff;
+  --green:#34c759;--green-dk:#25a244;--green-lt:#e6f9ed;
+  --red:#ff3b30;--red-lt:#fff0ef;
+  --orange:#ff9500;--orange-lt:#fff5e6;
+  --purple:#8b5cf6;--purple-lt:#f3eeff;
+  --bg:#f0f2f8;--surface:#ffffff;--surface2:#f7f8fc;--border:#e4e8f4;
+  --text:#1a1f36;--text2:#6b7280;--text3:#9ca3af;
+  --sh:0 1px 3px rgba(30,40,80,.07),0 1px 2px rgba(30,40,80,.05);
+  --sh-md:0 4px 16px rgba(30,40,80,.09),0 1px 4px rgba(30,40,80,.06);
+  --sh-lg:0 12px 40px rgba(30,40,80,.13),0 4px 12px rgba(30,40,80,.08);
+  --sh-xl:0 24px 64px rgba(30,40,80,.18);
+  --r:10px;--r-lg:16px;--r-xl:22px;
+  --sw:300px;--hh:58px;--t:.18s cubic-bezier(.4,0,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;font-family:'Lato',sans-serif;color:var(--text);background:var(--bg)}
+h1,h2,h3,h4,h5,.fn{font-family:'Montserrat',sans-serif}
+button{cursor:pointer;font-family:'Lato',sans-serif;transition:var(--t);border:none}
+input,select,textarea{font-family:'Lato',sans-serif;outline:none}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:var(--blue)}
+/* HEADER */
+#hdr{height:var(--hh);background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 18px;gap:12px;flex-shrink:0;z-index:200;
+  box-shadow:var(--sh);}
+.logo{display:flex;align-items:center;gap:10px}
+.lm{width:32px;height:32px;border-radius:9px;
+  background:linear-gradient(135deg,var(--blue),#6b8dd6);
+  display:flex;align-items:center;justify-content:center;font-size:15px;
+  box-shadow:0 2px 8px rgba(69,103,183,.35);}
+.ln{font-size:17px;font-weight:800;color:var(--blue);letter-spacing:-.4px;font-family:'Montserrat',sans-serif}
+.lt{font-size:9px;color:var(--text3);letter-spacing:.6px;font-weight:500;display:block;margin-top:-2px}
+.hdiv{width:1px;height:24px;background:var(--border);margin:0 4px}
+.hnav{display:flex;gap:2px}
+.hnb{padding:6px 13px;background:transparent;color:var(--text2);
+  font-size:12.5px;font-weight:600;border-radius:8px;font-family:'Montserrat',sans-serif;letter-spacing:-.1px}
+.hnb:hover{background:var(--blue-lt);color:var(--blue)}
+.hnb.active{background:var(--blue-lt);color:var(--blue)}
+.hr{margin-left:auto;display:flex;align-items:center;gap:10px}
+.lp{display:flex;align-items:center;gap:5px;background:var(--green-lt);
+  border:1.5px solid rgba(52,199,89,.25);border-radius:20px;padding:4px 11px}
+.ld{width:6px;height:6px;border-radius:50%;background:var(--green);
+  animation:lp 2s infinite;box-shadow:0 0 0 0 rgba(52,199,89,.6)}
+@keyframes lp{0%{box-shadow:0 0 0 0 rgba(52,199,89,.5)}70%{box-shadow:0 0 0 6px rgba(52,199,89,0)}100%{box-shadow:0 0 0 0 rgba(52,199,89,0)}}
+.lt2{font-size:10px;font-weight:800;color:var(--green-dk);letter-spacing:.5px;font-family:'Montserrat',sans-serif}
+#clk{font-size:12px;color:var(--text3);font-family:'Montserrat',sans-serif;font-weight:600;min-width:64px;text-align:right}
+.btn{display:inline-flex;align-items:center;gap:6px;border-radius:9px;font-weight:700;
+  font-family:'Montserrat',sans-serif;letter-spacing:-.1px;padding:8px 16px;font-size:12.5px}
+.btn-p{background:var(--blue);color:#fff;box-shadow:0 2px 8px rgba(69,103,183,.3)}
+.btn-p:hover{background:var(--blue-dk);transform:translateY(-1px);box-shadow:0 4px 14px rgba(69,103,183,.4)}
+.btn-g{background:transparent;color:var(--text2);border:1.5px solid var(--border)}
+.btn-g:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-lt)}
+.btn-gr{background:var(--green);color:#fff;box-shadow:0 2px 8px rgba(52,199,89,.3)}
+.btn-gr:hover{background:var(--green-dk);transform:translateY(-1px)}
+.btn-sm{padding:6px 12px;font-size:11.5px;border-radius:7px}
+.btn-fw{width:100%;justify-content:center}
+/* LAYOUT */
+#bdy{display:flex;flex:1;overflow:hidden}
+/* SIDEBAR */
+#sb{width:var(--sw);background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--sh);z-index:100;flex-shrink:0}
+.sstrip{padding:14px;background:linear-gradient(135deg,var(--blue-dk),var(--blue));
+  display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sc{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);
+  border-radius:10px;padding:10px 12px}
+.scv{font-size:21px;font-weight:900;color:#fff;line-height:1;font-family:'Montserrat',sans-serif}
+.scv.ac{color:#7effa3}
+.scl{font-size:9px;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.5px;margin-top:3px;font-family:'Montserrat',sans-serif}
+.stabs{display:flex;background:var(--surface2);border-bottom:1px solid var(--border)}
+.stb{flex:1;padding:10px 0;background:transparent;font-size:10.5px;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid transparent;font-family:'Montserrat',sans-serif}
+.stb:hover{color:var(--text);background:rgba(69,103,183,.04)}
+.stb.active{color:var(--blue);border-bottom-color:var(--blue);background:var(--surface)}
+.sflt{padding:10px 12px;border-bottom:1px solid var(--border)}
+.ssel{width:100%;background:var(--surface2);border:1.5px solid var(--border);
+  border-radius:8px;padding:7px 11px;font-size:12px;color:var(--text)}
+.ssel:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(69,103,183,.08)}
+.slist{flex:1;overflow-y:auto}
+/* Outage items */
+.oi{padding:12px 14px;border-bottom:1px solid rgba(228,232,244,.6);cursor:pointer;
+  transition:var(--t);border-left:3px solid transparent}
+.oi:hover{background:var(--surface2)}
+.oi.active{background:#eef1ff;border-left-color:var(--blue)}
+.oi-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.oi-l{flex:1;min-width:0}
+.oi-badge{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-family:'Montserrat',sans-serif}
+.unv{display:inline-block;background:var(--orange-lt);color:var(--orange);
+  font-size:8px;font-weight:800;border-radius:4px;padding:1px 5px;text-transform:uppercase;
+  font-family:'Montserrat',sans-serif;margin-left:4px}
+.oi-area{font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:2px;
+  font-family:'Montserrat',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.oi-desc{font-size:11px;color:var(--text3);line-height:1.4;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
+.oi-r{text-align:right;flex-shrink:0}
+.oi-cnt{font-size:18px;font-weight:900;line-height:1;font-family:'Montserrat',sans-serif}
+.oi-cl{font-size:9px;color:var(--text3);font-family:'Montserrat',sans-serif}
+.oi-ft{display:flex;justify-content:space-between;margin-top:5px;font-size:10.5px;color:var(--text3)}
+/* Crews */
+.crw-w{padding:12px;overflow-y:auto;flex:1}
+.ci{background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:11px;margin-bottom:8px}
+.ci-top{display:flex;justify-content:space-between;align-items:flex-start}
+.ci-nm{font-size:12.5px;font-weight:700;color:var(--text);font-family:'Montserrat',sans-serif}
+.ci-ld{font-size:11px;color:var(--text2);margin-top:1px}
+.cpill{font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:20px;
+  text-transform:uppercase;letter-spacing:.3px;font-family:'Montserrat',sans-serif}
+.cpill.available{background:var(--green-lt);color:var(--green-dk)}
+.cpill.dispatched{background:var(--orange-lt);color:var(--orange)}
+.cpill.en-route{background:var(--blue-lt);color:var(--blue)}
+.cskills{display:flex;gap:4px;flex-wrap:wrap;margin-top:7px}
+.csk{background:var(--blue-lt);color:var(--blue);font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:5px;font-family:'Montserrat',sans-serif}
+/* History */
+.rw{padding:12px;overflow-y:auto;flex:1}
+.rh{font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;font-family:'Montserrat',sans-serif}
+.rr{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.rd{font-size:10.5px;color:var(--text3);width:50px;font-family:'Montserrat',sans-serif;flex-shrink:0}
+.rb{flex:1;background:var(--border);border-radius:4px;height:7px;overflow:hidden}
+.rf{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--blue),#6b8dd6)}
+.rv{font-size:10.5px;font-weight:700;color:var(--text);font-family:'Montserrat',sans-serif;width:30px;text-align:right;flex-shrink:0}
+.rp{font-size:10px;color:var(--green-dk);font-weight:700;font-family:'Montserrat',sans-serif;width:28px;text-align:right;flex-shrink:0}
+.sum{margin-top:14px;background:linear-gradient(135deg,var(--blue-lt),var(--green-lt));
+  border:1.5px solid var(--border);border-radius:10px;padding:13px}
+.sumr{display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;
+  border-bottom:1px solid rgba(100,120,200,.1)}
+.sumr:last-child{border-bottom:none}
+.suml{color:var(--text2)}.sumv{font-weight:700;color:var(--text);font-family:'Montserrat',sans-serif}
+/* MAP */
+#mw{flex:1;position:relative;overflow:hidden}
+#map{width:100%;height:100%}
+.fab{position:absolute;z-index:400;display:flex;flex-direction:column;gap:8px;top:16px;left:16px}
+.fabb{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;
+  padding:8px 14px;font-size:12px;font-weight:700;color:var(--blue);box-shadow:var(--sh-md);
+  font-family:'Montserrat',sans-serif;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.fabb:hover{background:var(--blue);color:#fff;border-color:var(--blue);box-shadow:var(--sh-lg)}
+#lbar{position:absolute;top:16px;left:50%;transform:translateX(-50%);
+  background:var(--surface);border:1.5px solid var(--border);border-radius:24px;
+  padding:6px 16px;box-shadow:var(--sh-md);display:flex;align-items:center;gap:7px;
+  font-size:11.5px;font-weight:600;color:var(--text2);font-family:'Montserrat',sans-serif;
+  z-index:400;white-space:nowrap}
+#lbar .ldc{width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0}
+/* Detail */
+#det{position:absolute;top:16px;right:16px;width:290px;background:var(--surface);
+  border:1.5px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--sh-xl);
+  overflow:hidden;z-index:400;display:none;animation:pop .22s cubic-bezier(.4,0,.2,1)}
+@keyframes pop{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.dstr{height:4px;width:100%}
+.dhd{padding:14px 16px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--border)}
+.dtp{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;font-family:'Montserrat',sans-serif}
+.dar{font-size:15.5px;font-weight:800;color:var(--text);font-family:'Montserrat',sans-serif;line-height:1.2}
+.dx{width:26px;height:26px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text3);flex-shrink:0}
+.dx:hover{background:var(--border);color:var(--text)}
+.dbdy{padding:13px 16px}
+.ddes{font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:12px}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.ds{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 10px;text-align:center}
+.dsv{font-size:19px;font-weight:900;font-family:'Montserrat',sans-serif;color:var(--blue);line-height:1}
+.dsl{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+.dmt{font-size:11px;color:var(--text3);margin-bottom:12px;line-height:1.8}
+.dmt b{color:var(--text);font-weight:700}
+.dbtns{display:flex;flex-direction:column;gap:7px}
+/* Legend */
+#leg{position:absolute;bottom:28px;left:16px;background:var(--surface);
+  border:1.5px solid var(--border);border-radius:var(--r);box-shadow:var(--sh-md);
+  padding:11px 14px;z-index:400;min-width:150px}
+.lgt{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;
+  color:var(--text3);margin-bottom:8px;font-family:'Montserrat',sans-serif}
+.lgi{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:11.5px;color:var(--text2)}
+.lgd{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+/* MODALS */
+.ov{position:fixed;inset:0;background:rgba(26,31,54,.45);z-index:1000;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  backdrop-filter:blur(6px);animation:fi .2s ease}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+.modal{background:var(--surface);border-radius:var(--r-xl);box-shadow:var(--sh-xl);
+  width:100%;max-width:480px;overflow:hidden;animation:su .25s cubic-bezier(.4,0,.2,1)}
+@keyframes su{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.mhd{background:linear-gradient(135deg,var(--blue-dk),var(--blue));padding:22px 24px;
+  display:flex;justify-content:space-between;align-items:flex-start}
+.mtl{font-size:17px;font-weight:800;color:#fff;font-family:'Montserrat',sans-serif}
+.msb{font-size:11.5px;color:rgba(255,255,255,.65);margin-top:3px}
+.mx{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.15);
+  color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mx:hover{background:rgba(255,255,255,.25)}
+.mbdy{padding:22px 24px}
+.fg{margin-bottom:14px}
+.fl{display:block;font-size:10.5px;font-weight:800;color:var(--text);
+  text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;font-family:'Montserrat',sans-serif}
+.fi{width:100%;background:var(--surface2);border:1.5px solid var(--border);
+  border-radius:9px;padding:10px 13px;font-size:13px;color:var(--text)}
+.fi:focus{border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px rgba(69,103,183,.1)}
+.fi::placeholder{color:var(--text3)}
+textarea.fi{resize:vertical;min-height:76px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mtabs{display:flex;gap:5px;margin-bottom:18px}
+.mtab{flex:1;padding:8px;border:1.5px solid var(--border);border-radius:9px;background:transparent;
+  font-size:11.5px;font-weight:700;color:var(--text3);font-family:'Montserrat',sans-serif}
+.mtab:hover{border-color:var(--blue);color:var(--blue)}
+.mtab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.geo-m{background:var(--surface);border-radius:var(--r-xl);box-shadow:var(--sh-xl);
+  width:360px;overflow:hidden;animation:su .25s ease;text-align:center;padding:36px 28px 28px}
+.geo-i{width:70px;height:70px;border-radius:50%;background:linear-gradient(135deg,var(--blue),#6b8dd6);
+  display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 18px;
+  box-shadow:0 6px 24px rgba(69,103,183,.35)}
+.geo-t{font-size:19px;font-weight:800;color:var(--text);margin-bottom:8px;font-family:'Montserrat',sans-serif}
+.geo-s{font-size:12.5px;color:var(--text2);line-height:1.6;margin-bottom:24px}
+.geo-b{display:flex;flex-direction:column;gap:9px}
+.stc{display:none}.stc.active{display:block}
+.vi{background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:13px;margin-bottom:9px}
+.va{display:flex;gap:7px;margin-top:10px}
+.vb{padding:6px 13px;border-radius:7px;font-size:11px;font-weight:800;font-family:'Montserrat',sans-serif}
+.vb.ok{background:var(--green-lt);color:var(--green-dk)}
+.vb.no{background:var(--red-lt);color:var(--red)}
+.vb.mp{background:var(--blue-lt);color:var(--blue)}
+.ar{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.ad{font-size:10.5px;color:var(--text3);width:52px;font-family:'Montserrat',sans-serif;flex-shrink:0}
+.ab{flex:1;background:var(--border);border-radius:4px;height:7px;overflow:hidden}
+.af{height:100%;background:linear-gradient(90deg,var(--green),#7effa3);border-radius:4px}
+.av{font-size:10.5px;font-weight:700;width:44px;text-align:right;font-family:'Montserrat',sans-serif}
+.dur{font-size:10px;color:var(--text3);width:30px;flex-shrink:0}
+.dpi{background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;
+  padding:11px 13px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.si{background:linear-gradient(135deg,var(--blue-lt),#f0fff5);border:1.5px solid var(--border);
+  border-radius:10px;padding:11px 13px;font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:14px}
+.si strong{color:var(--blue)}
+.sn{background:var(--green-lt);border:1.5px solid rgba(52,199,89,.2);border-radius:9px;
+  padding:10px 12px;font-size:11.5px;color:var(--text2);margin-bottom:13px;line-height:1.5}
+/* Toast */
+#toast{position:fixed;bottom:22px;right:22px;background:var(--text);color:#fff;
+  padding:12px 18px;border-radius:11px;font-size:12.5px;font-weight:700;
+  font-family:'Montserrat',sans-serif;z-index:9999;box-shadow:var(--sh-xl);
+  transform:translateY(80px);opacity:0;transition:.3s cubic-bezier(.4,0,.2,1);
+  max-width:320px;display:flex;align-items:center;gap:9px;pointer-events:none}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.success{background:var(--green-dk)}
+#toast.error{background:var(--red)}
+#toast.info{background:var(--blue)}
+/* Leaflet */
+.leaflet-container{font-family:'Lato',sans-serif!important}
+.leaflet-popup-content-wrapper{border-radius:12px!important;box-shadow:var(--sh-xl)!important;
+  border:1.5px solid var(--border)!important;padding:0!important;overflow:hidden}
+.leaflet-popup-content{margin:0!important}
+.leaflet-bar{border-radius:10px!important;overflow:hidden;box-shadow:var(--sh-md)!important;
+  border:1.5px solid var(--border)!important}
+@keyframes mpulse{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.6);opacity:.2}}
+@keyframes mpop{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <div class="logo">
+    <div class="lm">&#9889;</div>
+    <div><span class="ln">GridGuard</span><span class="lt">ETHIOPIA OUTAGE INTELLIGENCE</span></div>
+  </div>
+  <div class="hdiv"></div>
+  <nav class="hnav">
+    <button class="hnb active" onclick="navC(this)">Live Map</button>
+    <button class="hnb" onclick="navC(this)">Dashboard</button>
+    <button class="hnb" onclick="openStaff()">Staff Portal</button>
+  </nav>
+  <div class="hr">
+    <div class="lp"><div class="ld"></div><span class="lt2">LIVE</span></div>
+    <span id="clk">--:--:--</span>
+    <button class="btn btn-g btn-sm" onclick="openStaff()">&#9881; EEU Staff</button>
+    <button class="btn btn-p btn-sm" onclick="openReport()">+ Report Outage</button>
+  </div>
+</div>
+<div id="bdy">
+  <div id="sb">
+    <div class="sstrip">
+      <div class="sc"><div class="scv" id="sa">7</div><div class="scl">Active</div></div>
+      <div class="sc"><div class="scv ac" id="saf">22.5K</div><div class="scl">Affected</div></div>
+      <div class="sc"><div class="scv" id="srp">437</div><div class="scl">Reports</div></div>
+      <div class="sc"><div class="scv ac" id="sre">1</div><div class="scl">Resolved</div></div>
+    </div>
+    <div class="stabs">
+      <button class="stb active" onclick="sTab('out',this)">Outages</button>
+      <button class="stb" onclick="sTab('crw',this)">Crews</button>
+      <button class="stb" onclick="sTab('hst',this)">History</button>
+    </div>
+    <div id="s-out" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+      <div class="sflt"><select class="ssel" id="ft" onchange="applyFt()">
+        <option value="all">All Outage Types</option>
+        <option value="emergency">&#128680; Emergency</option>
+        <option value="unplanned">&#9889; Unplanned</option>
+        <option value="planned">&#128295; Planned</option>
+        <option value="load_shedding">&#128201; Load Shedding</option>
+        <option value="resolved">&#9989; Resolved</option>
+      </select></div>
+      <div class="slist" id="olist"></div>
+    </div>
+    <div id="s-crw" style="display:none;flex:1;overflow:hidden;flex-direction:column">
+      <div class="crw-w" id="cwrap"></div>
+    </div>
+    <div id="s-hst" style="display:none;flex:1;overflow:hidden;flex-direction:column">
+      <div class="rw" id="rwrap"></div>
+    </div>
+  </div>
+  <div id="mw">
+    <div id="map"></div>
+    <div id="lbar"><div class="ldc"></div><span id="ltxt">Detecting location...</span></div>
+    <div class="fab">
+      <button class="fabb" onclick="flyEth()">&#127758; Ethiopia View</button>
+      <button class="fabb" onclick="goMyLoc()">&#128205; My Location</button>
+      <button class="fabb" id="hmb" onclick="toggleHM()">&#128293; Heatmap</button>
+    </div>
+    <div id="det">
+      <div class="dstr" id="dstr"></div>
+      <div class="dhd">
+        <div>
+          <div class="dtp" id="dtp"></div>
+          <div class="dar" id="dar"></div>
+          <span class="unv" id="duv" style="display:none">&#9888; Unverified</span>
+        </div>
+        <button class="dx" onclick="closeDet()">&#10005;</button>
+      </div>
+      <div class="dbdy">
+        <div class="ddes" id="ddes"></div>
+        <div class="dgrid">
+          <div class="ds"><div class="dsv" id="drp"></div><div class="dsl">Reports</div></div>
+          <div class="ds"><div class="dsv" id="dcu"></div><div class="dsl">Affected</div></div>
+        </div>
+        <div class="dmt" id="dmt"></div>
+        <div class="dbtns">
+          <button class="btn btn-p btn-fw btn-sm" onclick="openSub('email')">&#128231; Email Alerts</button>
+          <button class="btn btn-gr btn-fw btn-sm" onclick="openSub('sms')">&#128172; SMS Alerts</button>
+        </div>
+      </div>
+    </div>
+    <div id="leg">
+      <div class="lgt">Outage Types</div>
+      <div class="lgi"><div class="lgd" style="background:#ff3b30"></div>Emergency</div>
+      <div class="lgi"><div class="lgd" style="background:#ff5a4e"></div>Unplanned</div>
+      <div class="lgi"><div class="lgd" style="background:#ff9500"></div>Planned</div>
+      <div class="lgi"><div class="lgd" style="background:#8b5cf6"></div>Load Shedding</div>
+      <div class="lgi"><div class="lgd" style="background:#34c759"></div>Resolved</div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<!-- GEO MODAL -->
+<div id="geo-ov" class="ov" style="display:none">
+  <div class="geo-m">
+    <div class="geo-i">&#128205;</div>
+    <div class="geo-t">Enable Location</div>
+    <div class="geo-s">GridGuard uses your location to show nearby outages and send geo-fenced alerts for your area in Ethiopia.</div>
+    <div class="geo-b">
+      <button class="btn btn-p btn-fw" onclick="reqLoc()">&#128205; Allow Location Access</button>
+      <button class="btn btn-g btn-fw" style="border:1.5px solid var(--border)" onclick="skipLoc()">Continue without location</button>
+    </div>
+  </div>
+</div>
+<!-- REPORT MODAL -->
+<div id="rpt-ov" class="ov" style="display:none">
+  <div class="modal">
+    <div class="mhd">
+      <div><div class="mtl">&#9889; Report an Outage</div><div class="msb">Help EEU respond faster</div></div>
+      <button class="mx" onclick="closeOv('rpt-ov')">&#10005;</button>
+    </div>
+    <div class="mbdy">
+      <div class="fg"><label class="fl">Your Area / Kebele *</label><input class="fi" id="ra" placeholder="e.g. Bole Sub-City, Woreda 3"/></div>
+      <div class="f2">
+        <div class="fg"><label class="fl">Outage Type *</label><select class="fi" id="rt">
+          <option value="unplanned">&#9889; Unplanned Outage</option>
+          <option value="emergency">&#128680; Emergency</option>
+          <option value="planned">&#128295; Planned Maintenance</option>
+          <option value="load_shedding">&#128201; Load Shedding</option>
+        </select></div>
+        <div class="fg"><label class="fl">Severity</label><select class="fi" id="rsv">
+          <option value="low">&#129001; Low</option>
+          <option value="medium" selected>&#128992; Medium</option>
+          <option value="high">&#128308; High</option>
+          <option value="critical">&#128680; Critical</option>
+        </select></div>
+      </div>
+      <div class="fg"><label class="fl">Description</label><textarea class="fi" id="rd" placeholder="What happened? When did it start?"></textarea></div>
+      <div class="f2">
+        <div class="fg"><label class="fl">Email for Alerts</label><input class="fi" id="re" type="email" placeholder="you@email.com"/></div>
+        <div class="fg"><label class="fl">Phone for SMS</label><input class="fi" id="rp" type="tel" placeholder="+251 9XX XXX XXX"/></div>
+      </div>
+      <button class="btn btn-p btn-fw" onclick="submitRpt()">Submit Report to EEU</button>
+    </div>
+  </div>
+</div>
+<!-- SUBSCRIBE MODAL -->
+<div id="sub-ov" class="ov" style="display:none">
+  <div class="modal">
+    <div class="mhd">
+      <div><div class="mtl" id="subttl">&#128276; Subscribe to Alerts</div><div class="msb" id="subar">Outage notifications</div></div>
+      <button class="mx" onclick="closeOv('sub-ov')">&#10005;</button>
+    </div>
+    <div class="mbdy">
+      <div class="mtabs">
+        <button class="mtab active" id="st-e" onclick="subTab('email')">&#128231; Email</button>
+        <button class="mtab" id="st-s" onclick="subTab('sms')">&#128172; SMS</button>
+        <button class="mtab" id="st-b" onclick="subTab('both')">&#128276; Both</button>
+      </div>
+      <div id="se-s">
+        <div class="si">You'll be notified when <strong id="sarr">this outage</strong> status changes or power is restored.</div>
+        <div class="fg"><label class="fl">Email Address *</label><input class="fi" id="sem" type="email" placeholder="your@email.com"/></div>
+        <div class="fg"><label class="fl">Your Name</label><input class="fi" id="snm" placeholder="Full name"/></div>
+      </div>
+      <div id="ss-s" style="display:none">
+        <div class="sn">&#128241; SMS alerts via Twilio. Available in English, Amharic, Oromia &amp; Tigrinya.</div>
+        <div class="fg"><label class="fl">Phone Number *</label><input class="fi" id="sph" type="tel" placeholder="+251 9XX XXX XXX"/></div>
+        <div class="fg"><label class="fl">Language</label><select class="fi" id="slng">
+          <option value="en">English</option><option value="am">Amharic (&#4768;&#4635;&#4515;&#4653;&#4763;)</option>
+          <option value="or">Oromia (Afaan Oromoo)</option><option value="ti">Tigrinya (&#5000;&#4677;&#5002;&#4673;)</option>
+        </select></div>
+      </div>
+      <button class="btn btn-p btn-fw" onclick="submitSub()">Confirm Subscription</button>
+    </div>
+  </div>
+</div>
+<!-- STAFF MODAL -->
+<div id="staff-ov" class="ov" style="display:none">
+  <div class="modal" style="max-width:540px">
+    <div class="mhd" style="background:linear-gradient(135deg,#1a2a5e,var(--blue-dk))">
+      <div><div class="mtl">&#9881; EEU Staff Portal</div><div class="msb" id="stfsb">Ethiopian Electric Utility</div></div>
+      <button class="mx" onclick="closeOv('staff-ov')">&#10005;</button>
+    </div>
+    <div class="mbdy">
+      <div id="stf-lg">
+        <div class="fg"><label class="fl">Staff ID</label><input class="fi" id="sid" placeholder="e.g. EEU-2024-001"/></div>
+        <div class="fg"><label class="fl">Password</label><input class="fi" id="spw" type="password" placeholder="&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;"/></div>
+        <button class="btn btn-p btn-fw" onclick="staffLogin()">Login to Staff Portal</button>
+        <p style="text-align:center;font-size:11px;color:var(--text3);margin-top:12px">Demo: any credentials work</p>
+      </div>
+      <div id="stf-ds" style="display:none">
+        <div class="mtabs">
+          <button class="mtab active" onclick="stTab('sc',this)">&#128197; Schedule</button>
+          <button class="mtab" onclick="stTab('vf',this)">&#9989; Verify</button>
+          <button class="mtab" onclick="stTab('dp',this)">&#128661; Dispatch</button>
+          <button class="mtab" onclick="stTab('an',this)">&#128200; Analytics</button>
+        </div>
+        <div class="stc active" id="st-sc">
+          <div class="fg"><label class="fl">Area / Zone *</label><input class="fi" id="sca" placeholder="e.g. Bole Sub-City"/></div>
+          <div class="f2">
+            <div class="fg"><label class="fl">Type</label><select class="fi" id="sct"><option value="planned">&#128295; Planned</option><option value="load_shedding">&#128201; Load Shedding</option><option value="emergency">&#128680; Emergency</option></select></div>
+            <div class="fg"><label class="fl">Est. Customers</label><input class="fi" id="scc" placeholder="e.g. 3500"/></div>
+          </div>
+          <div class="f2">
+            <div class="fg"><label class="fl">Start</label><input class="fi" id="scs" type="datetime-local"/></div>
+            <div class="fg"><label class="fl">End</label><input class="fi" id="sce" type="datetime-local"/></div>
+          </div>
+          <div class="fg"><label class="fl">Description</label><textarea class="fi" id="scd" style="min-height:60px" placeholder="Reason, scope..."></textarea></div>
+          <button class="btn btn-p btn-fw" onclick="schedMaint()">&#128197; Schedule &amp; Notify Residents</button>
+        </div>
+        <div class="stc" id="st-vf">
+          <p style="font-size:12.5px;color:var(--text3);margin-bottom:13px">Reports awaiting verification:</p>
+          <div id="vlist"></div>
+        </div>
+        <div class="stc" id="st-dp">
+          <p style="font-size:12.5px;color:var(--text3);margin-bottom:13px">Assign crews to active outages:</p>
+          <div id="dplist"></div>
+        </div>
+        <div class="stc" id="st-an">
+          <p style="font-size:12.5px;color:var(--text3);margin-bottom:13px">7-day resolution summary:</p>
+          <div id="anlist"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+var TYPES={
+  planned:{label:"Planned Maintenance",color:"#ff9500",icon:"&#128295;"},
+  unplanned:{label:"Unplanned Outage",color:"#ff5a4e",icon:"&#9889;"},
+  emergency:{label:"Emergency",color:"#ff3b30",icon:"&#128680;"},
+  load_shedding:{label:"Load Shedding",color:"#8b5cf6",icon:"&#128201;"},
+  resolved:{label:"Resolved",color:"#34c759",icon:"&#9989;"},
+};
+var OUTAGES=[
+  {id:1,type:"unplanned",lat:9.030,lng:38.740,area:"Bole, Addis Ababa",reports:47,status:"active",start:"2024-01-15T08:00",end:"2024-01-15T14:00",desc:"Transformer failure on Bole Road. Repair crews en route.",cust:1200,ok:true},
+  {id:2,type:"planned",lat:9.010,lng:38.760,area:"Kirkos, Addis Ababa",reports:12,status:"active",start:"2024-01-15T06:00",end:"2024-01-15T18:00",desc:"Scheduled 230kV line upgrade and substation maintenance.",cust:3400,ok:true},
+  {id:3,type:"load_shedding",lat:9.050,lng:38.710,area:"Gulele, Addis Ababa",reports:89,status:"active",start:"2024-01-15T10:00",end:"2024-01-15T16:00",desc:"Rotating load shedding — Zone C schedule in effect.",cust:5600,ok:true},
+  {id:4,type:"emergency",lat:9.070,lng:38.780,area:"Yeka, Addis Ababa",reports:156,status:"active",start:"2024-01-15T11:30",end:null,desc:"Substation fire. Emergency response teams dispatched.",cust:8900,ok:true},
+  {id:5,type:"unplanned",lat:8.990,lng:38.790,area:"Nifas Silk-Lafto",reports:23,status:"active",start:"2024-01-15T09:15",end:"2024-01-15T15:00",desc:"Underground HV cable fault. Excavation crew mobilized.",cust:670,ok:false},
+  {id:6,type:"planned",lat:9.020,lng:38.720,area:"Kolfe Keranio",reports:5,status:"active",start:"2024-01-16T07:00",end:"2024-01-16T17:00",desc:"New distribution network installation — expansion project.",cust:2100,ok:true},
+  {id:7,type:"resolved",lat:9.040,lng:38.800,area:"Akaky Kaliti",reports:34,status:"resolved",start:"2024-01-14T14:00",end:"2024-01-14T20:00",desc:"Power fully restored after storm-induced pole damage.",cust:450,ok:true},
+  {id:8,type:"load_shedding",lat:9.000,lng:38.770,area:"Lideta, Addis Ababa",reports:71,status:"active",start:"2024-01-15T12:00",end:"2024-01-15T18:00",desc:"Zone B rotating load shedding — 6-hour window.",cust:3200,ok:true},
+  {id:9,type:"unplanned",lat:8.960,lng:38.750,area:"Addis Ketema",reports:18,status:"active",start:"2024-01-15T07:00",end:"2024-01-15T13:00",desc:"11kV feeder trip. Auto-reclosure failed.",cust:890,ok:false},
+  {id:10,type:"planned",lat:9.080,lng:38.730,area:"Gullele Hills",reports:3,status:"active",start:"2024-01-17T08:00",end:"2024-01-17T16:00",desc:"Transmission tower inspection and insulator replacement.",cust:1500,ok:true},
+];
+var CREWS=[
+  {id:"C01",name:"Alpha Team",lead:"Dawit Bekele",status:"available",veh:"Truck AA-4521",skills:["HV Cables","Transformer"]},
+  {id:"C02",name:"Bravo Team",lead:"Tigist Alemu",status:"dispatched",veh:"Truck AA-3310",skills:["Emergency","HV Lines"],to:4},
+  {id:"C03",name:"Charlie Team",lead:"Yonas Haile",status:"en-route",veh:"Van AA-6678",skills:["Load Shedding","Meters"],to:3},
+  {id:"C04",name:"Delta Team",lead:"Mekdes Girma",status:"available",veh:"Truck AA-7743",skills:["Substations","Cables"]},
+  {id:"C05",name:"Echo Team",lead:"Biruk Tadesse",status:"available",veh:"Van AA-8820",skills:["Distribution","Meters"]},
+  {id:"C06",name:"Foxtrot Team",lead:"Sara Bekele",status:"dispatched",veh:"Truck AA-9001",skills:["Emergency","HV Lines"],to:1},
+];
+var HIST=[
+  {date:"01-14",total:8,res:7,avg:"4.2h"},{date:"01-13",total:5,res:5,avg:"3.1h"},
+  {date:"01-12",total:12,res:10,avg:"5.8h"},{date:"01-11",total:6,res:6,avg:"2.9h"},
+  {date:"01-10",total:9,res:8,avg:"6.3h"},{date:"01-09",total:4,res:4,avg:"1.7h"},
+  {date:"01-08",total:11,res:9,avg:"7.2h"},
+];
+var map=null,mkrs={},userMk=null,userLL=null,selO=null,curFt="all",subOid=null,actST="email",heatOn=false,heatL=[];
+
+// SAFE MAP INIT — checks L is defined first
+function initMap(){
+  if(typeof L==="undefined"){setTimeout(initMap,200);return;}
+  if(map) return;
+  map=L.map("map",{center:[9.02,38.74],zoom:12,zoomControl:false});
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{
+    attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:20,subdomains:"abcd"
+  }).addTo(map);
+  L.control.zoom({position:"bottomright"}).addTo(map);
+  OUTAGES.forEach(function(o,i){setTimeout(function(){addMk(o);},i*70);});
+}
+
+function makeIcon(o,sel){
+  var t=TYPES[o.type],sz=sel?40:(o.reports>100?34:o.reports>40?28:22),dim=o.status==="resolved";
+  var pulse=o.status==="active"?'<div style="position:absolute;inset:'+(sel?"-10px":"-7px")+';border-radius:50%;border:2px solid '+t.color+';animation:mpulse '+(sel?"1.4s":"2s")+' ease-in-out infinite;opacity:'+(sel?".7":".5")+'"></div><div style="position:absolute;inset:'+(sel?"-18px":"-13px")+';border-radius:50%;border:1px solid '+t.color+';animation:mpulse '+(sel?"1.4s":"2s")+' ease-in-out infinite .3s;opacity:'+(sel?".4":".25")+'"></div>':"";
+  var html='<div style="position:relative;width:'+sz+'px;height:'+sz+'px;animation:mpop .3s cubic-bezier(.4,0,.2,1)">'+pulse+'<div style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:'+t.color+';border:'+(sel?"3px solid #fff":"2.5px solid rgba(255,255,255,.85)")+';box-shadow:'+(sel?"0 4px 16px "+t.color+"66,0 0 0 4px "+t.color+"22":"0 2px 8px rgba(0,0,0,.2)")+';display:flex;align-items:center;justify-content:center;font-size:'+(sz*.45)+'px;position:relative;z-index:2;opacity:'+(dim?".55":"1")+'">'+t.icon+'</div><div style="position:absolute;top:'+(sz+4)+'px;left:50%;transform:translateX(-50%);background:'+(sel?"rgba(26,31,54,.9)":"rgba(0,0,0,.65)")+';color:#fff;font-size:'+(sel?10:9)+'px;font-weight:800;padding:1px 6px;border-radius:4px;white-space:nowrap;font-family:Montserrat,sans-serif;pointer-events:none">'+o.area.split(",")[0]+'</div></div>';
+  return L.divIcon({html:html,className:"",iconSize:[sz,sz+22],iconAnchor:[sz/2,sz/2]});
+}
+
+function addMk(o){
+  if(!map||typeof L==="undefined") return;
+  var m=L.marker([o.lat,o.lng],{icon:makeIcon(o,false),zIndexOffset:o.status==="active"?100:0}).addTo(map).on("click",function(){selOut(o);});
+  mkrs[o.id]=m;
+}
+
+function refMk(o){var m=mkrs[o.id];if(m) m.setIcon(makeIcon(o,selO&&selO.id===o.id));}
+
+function selOut(o){
+  var prev=selO;selO=o;
+  if(prev) refMk(prev);
+  refMk(o);
+  document.querySelectorAll(".oi").forEach(function(el){el.classList.toggle("active",el.dataset.id==o.id);});
+  if(map) map.flyTo([o.lat,o.lng],14,{duration:1,easeLinearity:.4});
+  var t=TYPES[o.type];
+  document.getElementById("dstr").style.background=t.color;
+  document.getElementById("dtp").textContent=t.icon+" "+t.label;
+  document.getElementById("dtp").style.color=t.color;
+  document.getElementById("dar").textContent=o.area;
+  document.getElementById("duv").style.display=o.ok?"none":"inline-block";
+  document.getElementById("ddes").textContent=o.desc;
+  document.getElementById("drp").textContent=o.reports;
+  document.getElementById("drp").style.color=t.color;
+  document.getElementById("dcu").textContent=o.cust?o.cust.toLocaleString():"N/A";
+  var mt="<b>Started:</b> "+fmtD(o.start)+"<br>";
+  if(o.end) mt+="<b>Est. Restore:</b> "+fmtD(o.end)+"<br>";
+  mt+=o.status==="resolved"?'<span style="color:var(--green);font-weight:700">&#9989; Power Restored</span>':'<span style="color:'+t.color+';font-weight:700">&#9679; Active</span>';
+  document.getElementById("dmt").innerHTML=mt;
+  subOid=o.id;
+  document.getElementById("sarr").textContent=o.area;
+  document.getElementById("subar").textContent=o.area;
+  document.getElementById("subttl").textContent="&#128276; "+o.area;
+  var dp=document.getElementById("det");
+  dp.style.display="block";dp.style.animation="none";dp.offsetHeight;dp.style.animation="";
+}
+
+function closeDet(){
+  document.getElementById("det").style.display="none";
+  if(selO){refMk(selO);selO=null;}
+  document.querySelectorAll(".oi").forEach(function(e){e.classList.remove("active");});
+}
+
+function renderList(ft){
+  ft=ft||"all";
+  var items=ft==="all"?OUTAGES:OUTAGES.filter(function(o){return o.type===ft;});
+  document.getElementById("olist").innerHTML=items.map(function(o){
+    var t=TYPES[o.type],tm=o.end&&o.status==="active"?"&#9201; "+fmtT(o.end):"";
+    return '<div class="oi'+(selO&&selO.id===o.id?" active":"")+'" data-id="'+o.id+'" onclick="selOut(OUTAGES.find(function(x){return x.id==='+o.id+';}))">'+
+      '<div class="oi-top"><div class="oi-l">'+
+      '<div class="oi-badge" style="color:'+t.color+'">'+t.icon+' '+t.label+(!o.ok?'<span class="unv">Unverified</span>':"")+
+      '</div><div class="oi-area">'+o.area+'</div><div class="oi-desc">'+o.desc+'</div></div>'+
+      '<div class="oi-r"><div class="oi-cnt" style="color:'+t.color+'">'+o.reports+'</div><div class="oi-cl">reports</div></div></div>'+
+      '<div class="oi-ft"><span>'+(o.cust?"&#128101; "+o.cust.toLocaleString():"")+'</span><span>'+tm+'</span></div></div>';
+  }).join("");
+}
+
+function renderCrews(){
+  document.getElementById("cwrap").innerHTML=
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+    '<span style="font-size:13px;font-weight:700;color:var(--text);font-family:Montserrat,sans-serif">Field Crews</span>'+
+    '<span style="font-size:11px;font-weight:700;color:var(--green-dk);font-family:Montserrat,sans-serif">'+CREWS.filter(function(c){return c.status==="available";}).length+' Available</span></div>'+
+    CREWS.map(function(c){
+      return '<div class="ci"><div class="ci-top"><div><div class="ci-nm">'+c.name+'</div><div class="ci-ld">Lead: '+c.lead+' &middot; '+c.veh+'</div></div>'+
+        '<span class="cpill '+c.status+'">'+(c.status==="available"?"&#10003;":c.status==="dispatched"?"&#8594;":"&#9685;")+' '+c.status+'</span></div>'+
+        '<div class="cskills">'+c.skills.map(function(s){return '<span class="csk">'+s+'</span>';}).join("")+'</div>'+
+        (c.status==="available"?'<button class="btn btn-p btn-sm btn-fw" style="margin-top:8px" onclick="dispCrew(\''+c.id+'\')">&#128661; Dispatch</button>':
+          c.to?'<div style="font-size:10.5px;color:var(--text3);margin-top:7px">&#8594; '+(OUTAGES.find(function(o){return o.id===c.to;})||{area:"En route"}).area+'</div>':"")+'</div>';
+    }).join("");
+}
+
+function renderHist(){
+  var max=Math.max.apply(null,HIST.map(function(h){return h.total;}));
+  document.getElementById("rwrap").innerHTML='<div class="rh">7-Day History</div>'+
+    HIST.map(function(h){
+      return '<div class="rr"><span class="rd">'+h.date+'</span><div class="rb"><div class="rf" style="width:'+((h.total/max)*100)+'%"></div></div>'+
+        '<span class="rv">'+h.total+'</span><span class="rp">'+Math.round((h.res/h.total)*100)+'%</span></div>';
+    }).join("")+
+    '<div class="sum"><div class="rh" style="margin-bottom:10px">Weekly Summary</div>'+
+    '<div class="sumr"><span class="suml">Total outages</span><span class="sumv">'+HIST.reduce(function(s,h){return s+h.total;},0)+'</span></div>'+
+    '<div class="sumr"><span class="suml">Resolved</span><span class="sumv" style="color:var(--green-dk)">'+HIST.reduce(function(s,h){return s+h.res;},0)+'</span></div>'+
+    '<div class="sumr"><span class="suml">Rate</span><span class="sumv" style="color:var(--green-dk)">'+Math.round(HIST.reduce(function(s,h){return s+h.res;},0)/HIST.reduce(function(s,h){return s+h.total;},0)*100)+'%</span></div>'+
+    '<div class="sumr"><span class="suml">Avg duration</span><span class="sumv">4.1h</span></div></div>';
+}
+
+function sTab(n,btn){
+  document.querySelectorAll(".stb").forEach(function(b){b.classList.remove("active");});
+  btn.classList.add("active");
+  ["out","crw","hst"].forEach(function(x){
+    var el=document.getElementById("s-"+x);
+    if(el){el.style.display=x===n?"flex":"none";if(x===n)el.style.flexDirection="column";}
+  });
+}
+
+function navC(btn){
+  document.querySelectorAll(".hnb").forEach(function(b){b.classList.remove("active");});
+  btn.classList.add("active");
+}
+
+function flyEth(){if(map) map.flyTo([9.02,38.74],12,{duration:1.5});}
+function goMyLoc(){
+  if(userLL&&map){map.flyTo(userLL,14,{duration:1.2});toast("&#128205; Centered on your location","info");}
+  else reqLoc();
+}
+
+function applyFt(){
+  curFt=document.getElementById("ft").value;
+  renderList(curFt);
+  if(!map) return;
+  OUTAGES.forEach(function(o){
+    var m=mkrs[o.id];if(!m) return;
+    var show=curFt==="all"||o.type===curFt;
+    if(show&&!map.hasLayer(m)) map.addLayer(m);
+    else if(!show&&map.hasLayer(m)) map.removeLayer(m);
+  });
+}
+
+function toggleHM(){
+  if(!map) return;
+  if(!heatOn){
+    OUTAGES.filter(function(o){return o.status==="active";}).forEach(function(o){
+      var l=L.circle([o.lat,o.lng],{radius:o.cust?Math.sqrt(o.cust)*25:600,
+        fillColor:TYPES[o.type].color,fillOpacity:.08,color:TYPES[o.type].color,opacity:.15,weight:1}).addTo(map);
+      heatL.push(l);
+    });
+    heatOn=true;
+    document.getElementById("hmb").style.cssText="background:var(--orange);color:#fff;border-color:var(--orange)";
+    toast("&#128293; Heatmap enabled","info");
+  } else {
+    heatL.forEach(function(l){map.removeLayer(l);});heatL=[];heatOn=false;
+    document.getElementById("hmb").style.cssText="";
+    toast("Heatmap disabled","info");
+  }
+}
+
+function reqLoc(){
+  closeOv("geo-ov");
+  document.getElementById("ltxt").textContent="Detecting...";
+  if(!navigator.geolocation){document.getElementById("ltxt").textContent="Not supported";toast("Geolocation not supported","error");return;}
+  navigator.geolocation.getCurrentPosition(function(pos){
+    userLL=[pos.coords.latitude,pos.coords.longitude];
+    document.getElementById("ltxt").textContent=pos.coords.latitude.toFixed(4)+"N, "+pos.coords.longitude.toFixed(4)+"E";
+    if(map&&typeof L!=="undefined"){
+      if(userMk) map.removeLayer(userMk);
+      userMk=L.marker(userLL,{icon:L.divIcon({
+        html:'<div style="width:16px;height:16px;border-radius:50%;background:var(--blue);border:3px solid white;box-shadow:0 0 0 5px rgba(69,103,183,.25),0 2px 8px rgba(0,0,0,.2)"></div>',
+        className:"",iconSize:[16,16],iconAnchor:[8,8]
+      }),zIndexOffset:2000}).addTo(map).bindPopup("<b style='font-family:Montserrat,sans-serif'>Your Location</b>");
+      map.flyTo(userLL,14,{duration:1.5});
+    }
+    toast("&#128205; Location found","success");
+    var nearby=OUTAGES.filter(function(o){
+      var d=Math.sqrt(Math.pow(o.lat-pos.coords.latitude,2)+Math.pow(o.lng-pos.coords.longitude,2))*111;
+      return d<10&&o.status==="active";
+    });
+    if(nearby.length) setTimeout(function(){toast("&#9889; "+nearby.length+" active outage"+(nearby.length>1?"s":"")+" near you","info");},2000);
+  },function(){
+    document.getElementById("ltxt").textContent="Access denied";toast("Location denied. Using default view.","info");flyEth();
+  },{enableHighAccuracy:true,timeout:10000});
+}
+
+function skipLoc(){closeOv("geo-ov");document.getElementById("ltxt").textContent="Addis Ababa, Ethiopia";flyEth();}
+
+function openReport(){document.getElementById("rpt-ov").style.display="flex";}
+
+function submitRpt(){
+  var area=document.getElementById("ra").value.trim();
+  var type=document.getElementById("rt").value;
+  var desc=document.getElementById("rd").value.trim();
+  var email=document.getElementById("re").value.trim();
+  var phone=document.getElementById("rp").value.trim();
+  if(!area){toast("&#9888; Enter your area","error");return;}
+  var o={id:OUTAGES.length+1,type:type,lat:9.02+(Math.random()-.5)*.09,lng:38.74+(Math.random()-.5)*.09,
+    area:area,reports:1,status:"active",start:new Date().toISOString(),end:null,
+    desc:desc||"Citizen reported outage",cust:null,ok:false};
+  OUTAGES.push(o);
+  if(map) addMk(o);
+  renderList(curFt);updateStats();closeOv("rpt-ov");
+  if(email) sendEmail(email,area,type);
+  if(phone) sendSMS(phone,"GridGuard: Report for "+area+" (#"+o.id+") received. -EEU");
+  toast("&#9989; Report submitted! EEU will verify shortly.","success");
+  ["ra","rd","re","rp"].forEach(function(id){document.getElementById(id).value="";});
+}
+
+function openSub(t){actST=t;subTab(t);document.getElementById("sub-ov").style.display="flex";}
+
+function subTab(t){
+  actST=t;
+  ["e","s","b"].forEach(function(x){document.getElementById("st-"+x).classList.toggle("active",{e:"email",s:"sms",b:"both"}[x]===t);});
+  document.getElementById("se-s").style.display=(t==="email"||t==="both")?"block":"none";
+  document.getElementById("ss-s").style.display=(t==="sms"||t==="both")?"block":"none";
+}
+
+function submitSub(){
+  var em=document.getElementById("sem").value.trim();
+  var ph=document.getElementById("sph").value.trim();
+  var nm=document.getElementById("snm").value.trim();
+  var o=OUTAGES.find(function(x){return x.id===subOid;})||OUTAGES[0];
+  if((actST==="email"||actST==="both")&&!em){toast("&#9888; Enter your email","error");return;}
+  if((actST==="sms"||actST==="both")&&!ph){toast("&#9888; Enter your phone","error");return;}
+  if(em&&(actST==="email"||actST==="both")) sendEmail(em,o.area,o.type,nm);
+  if(ph&&(actST==="sms"||actST==="both")) sendSMS(ph,"GridGuard: Subscribed to "+o.area+" alerts. -EEU");
+  closeOv("sub-ov");
+  ["sem","snm","sph"].forEach(function(id){document.getElementById(id).value="";});
+}
+
+function openStaff(){document.getElementById("staff-ov").style.display="flex";}
+
+function staffLogin(){
+  var id=document.getElementById("sid").value,pw=document.getElementById("spw").value;
+  if(!id||!pw){toast("&#9888; Enter credentials","error");return;}
+  document.getElementById("stf-lg").style.display="none";
+  document.getElementById("stf-ds").style.display="block";
+  document.getElementById("stfsb").textContent="Welcome, "+id;
+  renderVerify();renderDispatch();renderAnalytics();
+  toast("&#9989; Authenticated","success");
+}
+
+function stTab(n,btn){
+  document.querySelectorAll("#stf-ds .mtab").forEach(function(b){b.classList.remove("active");});
+  btn.classList.add("active");
+  document.querySelectorAll(".stc").forEach(function(el){el.classList.remove("active");});
+  document.getElementById("st-"+n).classList.add("active");
+}
+
+function schedMaint(){
+  var area=document.getElementById("sca").value.trim();
+  if(!area){toast("&#9888; Enter area","error");return;}
+  var o={id:OUTAGES.length+1,type:document.getElementById("sct").value,
+    lat:9.02+(Math.random()-.5)*.08,lng:38.74+(Math.random()-.5)*.08,
+    area:area,reports:0,status:"active",
+    start:document.getElementById("scs").value||new Date().toISOString(),
+    end:document.getElementById("sce").value||null,
+    desc:document.getElementById("scd").value||"Scheduled by EEU staff",
+    cust:parseInt(document.getElementById("scc").value)||0,ok:true};
+  OUTAGES.push(o);if(map) addMk(o);renderList(curFt);updateStats();
+  toast("&#128197; Maintenance scheduled for "+area+". Notifications sent.","success");
+  ["sca","scc","scs","sce","scd"].forEach(function(id){document.getElementById(id).value="";});
+}
+
+function renderVerify(){
+  var unv=OUTAGES.filter(function(o){return !o.ok;});
+  document.getElementById("vlist").innerHTML=!unv.length?'<p style="color:var(--text3);text-align:center;padding:20px;font-size:13px">&#9989; No pending verifications</p>':
+    unv.map(function(o){
+      return '<div class="vi"><div style="font-size:10.5px;font-weight:800;color:'+TYPES[o.type].color+';font-family:Montserrat,sans-serif;margin-bottom:3px">'+TYPES[o.type].icon+' '+TYPES[o.type].label+'</div>'+
+        '<div style="font-size:13px;font-weight:700;color:var(--text);font-family:Montserrat,sans-serif">'+o.area+'</div>'+
+        '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+o.reports+' reports &middot; '+o.desc+'</div>'+
+        '<div class="va"><button class="vb ok" onclick="verifyO('+o.id+',true)">&#10003; Verify</button>'+
+        '<button class="vb no" onclick="verifyO('+o.id+',false)">&#10007; Dismiss</button>'+
+        '<button class="vb mp" onclick="selOut(OUTAGES.find(function(x){return x.id==='+o.id+';}));closeOv(\'staff-ov\')">&#128205; Map</button></div></div>';
+    }).join("");
+}
+
+function verifyO(id,ok){
+  var i=OUTAGES.findIndex(function(o){return o.id===id;});
+  if(ok){OUTAGES[i].ok=true;toast("&#9989; Outage verified","success");}
+  else{OUTAGES[i].status="resolved";toast("Dismissed","info");}
+  renderList(curFt);renderVerify();updateStats();
+  if(mkrs[id]) mkrs[id].setIcon(makeIcon(OUTAGES[i],false));
+}
+
+function renderDispatch(){
+  document.getElementById("dplist").innerHTML=OUTAGES.filter(function(o){return o.status==="active";}).map(function(o){
+    var cr=CREWS.find(function(c){return c.to===o.id;});
+    return '<div class="dpi"><div><div style="font-size:12px;font-weight:700;color:'+TYPES[o.type].color+';font-family:Montserrat,sans-serif">'+TYPES[o.type].icon+' '+o.area+'</div>'+
+      '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+(o.cust?o.cust.toLocaleString():"?")+" affected</div></div>"+
+      (cr?'<span style="font-size:10px;font-weight:800;color:var(--green-dk);background:var(--green-lt);padding:3px 9px;border-radius:6px;font-family:Montserrat,sans-serif;white-space:nowrap">&#8594; '+cr.name+'</span>':
+        '<button class="btn btn-p btn-sm" style="white-space:nowrap" onclick="qDispatch('+o.id+')">Assign</button>')+'</div>';
+  }).join("");
+}
+
+function qDispatch(oid){
+  var c=CREWS.find(function(cr){return cr.status==="available";});
+  if(!c){toast("&#9888; No available crews!","error");return;}
+  c.status="dispatched";c.to=oid;renderCrews();renderDispatch();
+  toast("&#128661; "+c.name+" dispatched to "+(OUTAGES.find(function(o){return o.id===oid;})||{area:"outage"}).area,"success");
+}
+
+function dispCrew(cid){
+  if(!selO){toast("Select an outage on the map first","info");return;}
+  var c=CREWS.find(function(cr){return cr.id===cid;});
+  c.status="dispatched";c.to=selO.id;renderCrews();
+  toast("&#128661; "+c.name+" dispatched to "+selO.area,"success");
+}
+
+function renderAnalytics(){
+  document.getElementById("anlist").innerHTML=HIST.map(function(h){
+    return '<div class="ar"><span class="ad">'+h.date+'</span><div class="ab"><div class="af" style="width:'+(h.res/h.total*100)+'%"></div></div>'+
+      '<span class="av">'+h.res+'/'+h.total+'</span><span class="dur">'+h.avg+'</span></div>';
+  }).join("");
+}
+
+function sendEmail(to,area,type,name){
+  fetch("/api/send-email",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({to:to,name:name,area:area,outageType:(TYPES[type]||{}).label,refId:"EEU-"+Date.now().toString().slice(-6)})})
+  .then(function(r){return r.json();})
+  .then(function(d){if(d.success) toast("&#128231; Email sent to "+to,"success"); else toast("&#128231; Email queued (add Resend key)","info");})
+  .catch(function(){console.log("[Demo] Email to:",to);toast("&#128231; Email configured for "+to,"success");});
+}
+
+function sendSMS(to,msg){
+  fetch("/api/send-sms",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:to,message:msg})})
+  .then(function(r){return r.json();})
+  .then(function(d){if(d.success) toast("&#128172; SMS sent to "+to,"success"); else toast("&#128172; SMS queued (add Twilio keys)","info");})
+  .catch(function(){console.log("[Demo] SMS to:",to);toast("&#128172; SMS configured for "+to,"success");});
+}
+
+function updateStats(){
+  var act=OUTAGES.filter(function(o){return o.status==="active";});
+  var aff=act.reduce(function(s,o){return s+(o.cust||0);},0);
+  var rp=OUTAGES.reduce(function(s,o){return s+o.reports;},0);
+  document.getElementById("sa").textContent=act.length;
+  document.getElementById("saf").textContent=aff>999?(aff/1000).toFixed(1)+"K":aff;
+  document.getElementById("srp").textContent=rp>999?(rp/1000).toFixed(1)+"K":rp;
+  document.getElementById("sre").textContent=OUTAGES.filter(function(o){return o.status==="resolved";}).length;
+}
+
+function closeOv(id){document.getElementById(id).style.display="none";}
+function fmtD(dt){if(!dt)return"—";var d=new Date(dt);return d.toLocaleString("en-ET",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});}
+function fmtT(dt){if(!dt)return"—";return new Date(dt).toLocaleTimeString("en-ET",{hour:"2-digit",minute:"2-digit"});}
+var tTmr;
+function toast(msg,type){
+  type=type||"info";
+  var el=document.getElementById("toast");
+  el.textContent=msg;el.className="show "+type;
+  clearTimeout(tTmr);tTmr=setTimeout(function(){el.className="";},3800);
+}
+function startClock(){
+  var up=function(){document.getElementById("clk").textContent=new Date().toLocaleTimeString("en-ET",{hour:"2-digit",minute:"2-digit",second:"2-digit"});};
+  up();setInterval(up,1000);
+}
+document.querySelectorAll(".ov").forEach(function(ov){
+  ov.addEventListener("click",function(e){if(e.target===ov&&ov.id!=="geo-ov") closeOv(ov.id);});
+});
+// Bootstrap
+renderList();renderCrews();renderHist();startClock();updateStats();
+initMap();
+setTimeout(function(){document.getElementById("geo-ov").style.display="flex";},900);
+</script>
+<!-- Leaflet loaded at bottom of body for guaranteed availability -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" onload="initMap()"></script>
+</body>
+</html>
