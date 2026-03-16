@@ -4,7 +4,7 @@
 
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { createSession } from '@/lib/session';
+import { encrypt } from '@/lib/session';
 import { RATE_LIMITS, getClientIP } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
@@ -72,12 +72,22 @@ export async function POST(request: Request) {
       .eq('id', user.id);
 
     // Create secure HTTP-only session cookie
+    const sessionToken = await encrypt({ id: user.id, username: user.username, role: user.role, name: user.name });
+    
     const response = NextResponse.json({
       success: true,
       user: { id: user.id, username: user.username, role: user.role, name: user.name },
+      token: sessionToken
     });
     
-    await createSession(response, { id: user.id, username: user.username, role: user.role, name: user.name });
+    // Also set as cookie for standard web usage
+    response.cookies.set('gridguard_session', sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 8 * 3600, // 8 hours
+      sameSite: 'lax',
+      path: '/',
+    });
 
     // Log login event
     await supabase.from('system_feed').insert({

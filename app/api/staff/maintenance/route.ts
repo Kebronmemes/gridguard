@@ -1,20 +1,20 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { decrypt } from '@/lib/session';
 import { notifyAreaSubscribers } from '@/lib/mailer';
 
 export const dynamic = 'force-dynamic';
 
-function validateToken(authHeader: string | null): { valid: boolean; user?: any } {
+async function validateToken(authHeader: string | null): Promise<{ valid: boolean; user?: any }> {
   if (!authHeader || !authHeader.startsWith('Bearer ')) return { valid: false };
-  try {
-    const payload = JSON.parse(Buffer.from(authHeader.split(' ')[1], 'base64').toString());
-    if (payload.exp < Date.now()) return { valid: false };
-    return { valid: true, user: payload };
-  } catch { return { valid: false }; }
+  const token = authHeader.split(' ')[1];
+  const payload = await decrypt(token);
+  if (!payload) return { valid: false };
+  return { valid: true, user: payload };
 }
 
 export async function POST(request: Request) {
-  const auth = validateToken(request.headers.get('authorization'));
+  const auth = await validateToken(request.headers.get('authorization'));
   if (!auth.valid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {

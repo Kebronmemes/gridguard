@@ -28,8 +28,9 @@ export default function StaffLogin() {
       const data = await res.json();
 
       if (data.success) {
-        // HTTP-only cookie is set by the backend. Just store user for UI contexts.
+        // Store both user data and the secure JWT token
         localStorage.setItem('gridguard_user', JSON.stringify(data.user));
+        localStorage.setItem('gridguard_token', data.token);
         router.push('/staff');
       } else {
         setError(data.error || 'Login failed');
