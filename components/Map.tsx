@@ -138,45 +138,48 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
         const baseRadius = radiusMap[o.severity] || 2000;
         const color = SEVERITY_COLORS[o.severity] || '#ef4444';
 
+        if (!o.coordinates || !Array.isArray(o.coordinates) || o.coordinates.length < 2) return null;
+
         return (
-        <div key={o.id}>
-          {/* Inner opaque core */}
-          <Circle center={o.coordinates} radius={baseRadius * 0.15} pathOptions={{ fillOpacity: 0.9, fillColor: color, weight: 0 }}>
-            <Popup>
-              <div className="font-sans min-w-[220px] p-1">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-bold text-slate-900 text-base">{o.area}</h3>
-                  <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                    style={{ backgroundColor: color + '20', color: color }}>
-                    {o.severity.toUpperCase()}
-                  </span>
-                </div>
-                <div className="space-y-1.5 text-sm">
-                  <p className="text-slate-600"><span className="font-medium text-slate-800">Type:</span> {TYPE_LABELS[o.type] || o.type}</p>
-                  <p className="text-slate-600"><span className="font-medium text-slate-800">Cause:</span> {o.reason}</p>
-                  <p className="text-slate-600"><span className="font-medium text-slate-800">Reports:</span> {o.reportCount} people affected</p>
-                  <p className="text-slate-600"><span className="font-medium text-slate-800">Started:</span> {new Date(o.startTime).toLocaleTimeString()}</p>
-                  <p className="text-slate-600"><span className="font-medium text-slate-800">ETA Restore:</span> {new Date(o.estimatedRestoreTime).toLocaleTimeString()}</p>
-                  <p className="text-slate-600"><span className="font-medium text-slate-800">Status:</span>
-                    <span className={`ml-1 px-1.5 py-0.5 rounded text-xs font-medium ${o.status === 'active' ? 'bg-red-100 text-red-700' : o.status === 'repair_in_progress' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
-                      {o.status.replace(/_/g, ' ')}
+          <div key={o.id}>
+            {/* Inner opaque core */}
+            <Circle center={o.coordinates as [number, number]} radius={baseRadius * 0.15} pathOptions={{ fillOpacity: 0.9, fillColor: color, weight: 0 }}>
+              <Popup>
+                <div className="font-sans min-w-[220px] p-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-bold text-slate-900 text-base">{o.area}</h3>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                      style={{ backgroundColor: color + '20', color: color }}>
+                      {o.severity.toUpperCase()}
                     </span>
-                  </p>
-                  {o.verifiedByStaff && (
-                    <p className="text-green-600 text-xs font-semibold mt-1">✓ Verified by EEU Staff</p>
-                  )}
+                  </div>
+                  <div className="space-y-1.5 text-sm">
+                    <p className="text-slate-600"><span className="font-medium text-slate-800">Type:</span> {TYPE_LABELS[o.type] || o.type}</p>
+                    <p className="text-slate-600"><span className="font-medium text-slate-800">Cause:</span> {o.reason}</p>
+                    <p className="text-slate-600"><span className="font-medium text-slate-800">Reports:</span> {o.reportCount} people affected</p>
+                    <p className="text-slate-600"><span className="font-medium text-slate-800">Started:</span> {new Date(o.startTime).toLocaleTimeString()}</p>
+                    <p className="text-slate-600"><span className="font-medium text-slate-800">ETA Restore:</span> {new Date(o.estimatedRestoreTime).toLocaleTimeString()}</p>
+                    <p className="text-slate-600"><span className="font-medium text-slate-800">Status:</span>
+                      <span className={`ml-1 px-1.5 py-0.5 rounded text-xs font-medium ${o.status === 'active' ? 'bg-red-100 text-red-700' : o.status === 'repair_in_progress' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {o.status.replace(/_/g, ' ')}
+                      </span>
+                    </p>
+                    {o.verifiedByStaff && (
+                      <p className="text-green-600 text-xs font-semibold mt-1">✓ Verified by EEU Staff</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </Popup>
-          </Circle>
-          
-          {/* Middle band */}
-          <Circle center={o.coordinates} radius={baseRadius * 0.5} pathOptions={{ fillOpacity: 0.3, fillColor: color, weight: 0 }} />
-          
-          {/* Outer diffuse halo */}
-          <Circle center={o.coordinates} radius={baseRadius} pathOptions={{ fillOpacity: 0.1, fillColor: color, color: color, weight: 1, dashArray: '4 6' }} />
-        </div>
-      )})}
+              </Popup>
+            </Circle>
+            
+            {/* Middle band */}
+            <Circle center={o.coordinates as [number, number]} radius={baseRadius * 0.5} pathOptions={{ fillOpacity: 0.3, fillColor: color, weight: 0 }} />
+            
+            {/* Outer diffuse halo */}
+            <Circle center={o.coordinates as [number, number]} radius={baseRadius} pathOptions={{ fillOpacity: 0.1, fillColor: color, color: color, weight: 1, dashArray: '4 6' }} />
+          </div>
+        );
+      })}
     </MapContainer>
   );
 }

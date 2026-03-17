@@ -121,7 +121,7 @@ async function processEEUJsonResponse(
 
       // Extract district/area info from title and body using Gemini
       const combinedText = title + '\n\n' + body;
-      let extraction: { districts: string[]; times: { start: string; end: string; }; severity: string; reason_en: string; } | null = await extractLocationsAndTimes(combinedText);
+      let extraction: { districts: string[]; times: { start: string; end: string | null; }; severity: string; reason_en: string; } | null = await extractLocationsAndTimes(combinedText);
       
       // Fallback to regex if Gemini fails
       if (!extraction) {
@@ -137,7 +137,7 @@ async function processEEUJsonResponse(
           district: matched?.district || district,
           subcity: matched?.subcity || district,
           startTime: times.start || item.published_date || new Date().toISOString(),
-          endTime: times.end || '',
+          endTime: times.end,
           reason: extraction.reason_en || title,
           sourceUrl: `${EEU_API_BASE}/power-interruption/detail/${item.id}`,
           coordinates: matched?.coords || null,
@@ -278,7 +278,14 @@ async function mapExtractedToInterruptions(
 
     console.log(`[Crawler] Mapping chunk ${(c / chunkSize) + 1} to database...`);
 
-    let extractedOutages: any[] = [];
+    let extractedOutages: Array<{
+      districts: string[];
+      start_time: string;
+      end_time: string | null;
+      reason: string;
+      severity: string;
+    }> = [];
+    
     if (chunkSize === 1 && items[0].districts) {
       // Already extracted (fallback path)
       extractedOutages = items;
@@ -298,7 +305,7 @@ async function mapExtractedToInterruptions(
               district: finalDistrict,
               subcity: matched?.subcity || finalDistrict,
               startTime: outage.start_time || new Date().toISOString(),
-              endTime: outage.end_time || '',
+              endTime: outage.end_time,
               reason: outage.reason || 'EEU Power Interruption',
               sourceUrl: `${EEU_API_BASE}/power-interruption?lang=en`,
               coordinates: matched?.coords || null,
@@ -343,12 +350,12 @@ async function mapExtractedToInterruptions(
  */
 function extractInterruptionDetails(text: string): {
   districts: string[];
-  times: { start: string; end: string };
+  times: { start: string; end: string | null };
   severity: string;
   reason_en: string;
 } {
   const districts: string[] = [];
-  const times = { start: '', end: '' };
+  const times = { start: '', end: null as string | null };
 
   // Match known area names
   for (const area of ETHIOPIAN_AREAS) {

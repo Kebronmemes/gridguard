@@ -8,7 +8,7 @@ export async function GET() {
     const { data: activeOutages, error } = await supabase
       .from('district_history')
       .select('*')
-      .is('end_time', null);
+      .or('end_time.is.null,end_time.eq.""');
 
     if (error || !activeOutages) {
       console.error('Supabase active outages error:', error);

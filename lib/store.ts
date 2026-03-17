@@ -73,7 +73,7 @@ export interface EEUInterruption {
   district: string;
   subcity: string;
   startTime: string;
-  endTime: string;
+  endTime: string | null;
   reason: string;
   sourceUrl: string;
   coordinates: [number, number] | null;

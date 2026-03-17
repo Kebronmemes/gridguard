@@ -165,7 +165,7 @@ function delay(ms: number): Promise<void> {
  */
 export async function extractLocationsAndTimes(text: string): Promise<{
   districts: string[];
-  times: { start: string; end: string };
+  times: { start: string; end: string | null };
   severity: string;
   reason_en: string;
 } | null> {
@@ -232,8 +232,9 @@ ${text}
 export async function extractAllLocationsAndTimesFromHtml(text: string): Promise<Array<{
   districts: string[];
   start_time: string;
-  end_time: string;
+  end_time: string | null;
   reason: string;
+  severity: string;
 }>> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || !text) return [];
