@@ -42,6 +42,13 @@ export const ETHIOPIAN_AREAS = [
   { area: 'Sululta', district: 'Oromia', subcity: 'Sululta', coords: [9.1833, 38.7500] as [number, number] },
   { area: 'Sebeta', district: 'Oromia', subcity: 'Sebeta', coords: [8.9167, 38.6167] as [number, number] },
   { area: 'Burayu', district: 'Oromia', subcity: 'Burayu', coords: [9.0667, 38.6667] as [number, number] },
+  { area: 'Nekemte', district: 'Oromia', subcity: 'Nekemte', coords: [9.0833, 36.5500] as [number, number] },
+  { area: 'Sheger', district: 'Oromia', subcity: 'Sheger City', coords: [9.0300, 38.7000] as [number, number] },
+  { area: 'Legetafo', district: 'Oromia', subcity: 'Legetafo', coords: [9.0900, 38.8900] as [number, number] },
+  { area: 'Tafo', district: 'Oromia', subcity: 'Legetafo', coords: [9.0900, 38.8900] as [number, number] },
+  { area: 'Sendafa', district: 'Oromia', subcity: 'Sendafa', coords: [9.1500, 39.0300] as [number, number] },
+  { area: 'Jomo', district: 'Addis Ababa', subcity: 'Nifas Silk-Lafto', coords: [8.9600, 38.7000] as [number, number] },
+  { area: 'Atlas', district: 'Addis Ababa', subcity: 'Bole', coords: [9.0180, 38.7830] as [number, number] },
 ];
 
 // ----- Find nearest area from coordinates -----

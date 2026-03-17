@@ -60,6 +60,8 @@ CREATE TABLE IF NOT EXISTS staff_users (
   name TEXT NOT NULL,
   role TEXT DEFAULT 'field_tech',
   email TEXT,
+  failed_attempts INT DEFAULT 0,
+  last_login TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { MapContainer, TileLayer, Polygon, Circle, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Polygon, Circle, Popup, useMap, LayerGroup } from "react-leaflet";
 import type { Outage } from "@/lib/types";
 
 const ADDIS_ABABA: [number, number] = [9.0, 38.75];
@@ -141,7 +141,7 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
         if (!o.coordinates || !Array.isArray(o.coordinates) || o.coordinates.length < 2) return null;
 
         return (
-          <div key={o.id}>
+          <LayerGroup key={o.id}>
             {/* Inner opaque core */}
             <Circle center={o.coordinates as [number, number]} radius={baseRadius * 0.15} pathOptions={{ fillOpacity: 0.9, fillColor: color, weight: 0 }}>
               <Popup>
@@ -177,7 +177,7 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
             
             {/* Outer diffuse halo */}
             <Circle center={o.coordinates as [number, number]} radius={baseRadius} pathOptions={{ fillOpacity: 0.1, fillColor: color, color: color, weight: 1, dashArray: '4 6' }} />
-          </div>
+          </LayerGroup>
         );
       })}
     </MapContainer>
