@@ -89,13 +89,6 @@ export async function POST(request: Request) {
       path: '/',
     });
 
-    // Log login event
-    await supabase.from('system_feed').insert({
-      type: 'grid_update',
-      message: `🔐 Staff login: ${user.name} (${user.role})`,
-      area: 'System',
-    });
-
     return response;
   } catch (err) {
     console.error('Auth Error:', err);

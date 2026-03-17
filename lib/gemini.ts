@@ -243,28 +243,26 @@ export async function extractAllLocationsAndTimesFromHtml(text: string): Promise
 
   try {
     const prompt = `
-I am building an outage monitor website and I need you to translate the following JSON power interruption data from the Ethiopian Electric Utility website.
-The data contains announcements for multiple scheduled power outages, mostly written in Amharic.
+I am building an outage monitor website and I need you to translate the following power interruption announcement from the Ethiopian Electric Utility.
+The text contains multiple scheduled outages.
 
-For EACH distinct outage object you find in the data, you must:
-1. Translate the Amharic text to English.
-2. Extract the start time and end time.
-3. Extract the reason/cause (in English).
-4. Give me the district/city names in English that will be affected.
+For EACH distinct outage found, you MUST:
+1. Identify the time range. It often follows a "✅" emoji (e.g., ✅ ከጠዋቱ 1:30 - 11:30).
+2. Identify the affected areas. They often follow a "👉" emoji (e.g., 👉አትላስ ሆቴል...).
+3. Translate the Amharic area names and reasons to English.
+4. Convert Ethiopian dates (e.g. መጋቢት 08 ቀን 2018) to Gregorian (e.g. March 17, 2026).
 
 IMPORTANT GEOGRAPHIC RULES:
-After identifying the English district names, you MUST map the PRIMARY affected district/city ONLY to this strict list of known districts/subcities:
+After identifying the English district names, you MUST map the PRIMARY affected district/city ONLY to this strict list:
 [Bole, Piassa, Merkato, Kazanchis, Sarbet, Megenagna, Ayat, CMC, Akaki Kaliti, Kolfe Keranio, Lideta, Kirkos, Nifas Silk-Lafto, Yeka, Gulele, Arada, Addis Ketema, Bahir Dar, Hawassa, Dire Dawa, Adama, Jimma, Mekelle, Gondar, Dessie, Debre Birhan, Bishoftu, Shashamane, Arba Minch, Woldia, Debre Markos, Sululta, Sebeta, Burayu]
 
-CRITICAL: If the 'city' property says "አዲስ አበባ" (Addis Ababa), you MUST look at the 'affectedAreas' or 'reason' to figure out which sub-district it belongs to (e.g., Yeka, Bole, Kolfe Keranio, etc.) and output that EXACT matching sub-district from the list. If it is a regional city like Debre Markos, output exactly "Debre Markos". If you cannot find any matching district on the list, output "Addis Ketema" as a default fallback for Addis Ababa outages, or the "city" name in English for regional outages. Do NOT return an empty list.
-
-Output ONLY valid JSON in this exact format (an array of objects), with no markdown formatting or backticks around it:
+Output ONLY valid JSON in this exact format (an array of objects):
 [
   {
     "districts": ["English District from the list above"],
-    "start_time": "Readable Start info / ISO format",
-    "end_time": "Readable End info / ISO format",
-    "reason": "English translation of the reason",
+    "start_time": "ISO format (YYYY-MM-DDTHH:mm:ssZ)",
+    "end_time": "ISO format (YYYY-MM-DDTHH:mm:ssZ)",
+    "reason": "English translation of why the power is turning off",
     "severity": "low" | "moderate" | "critical" | "grid_failure"
   }
 ]

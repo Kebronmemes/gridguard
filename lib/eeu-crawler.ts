@@ -9,7 +9,8 @@ import * as cheerio from 'cheerio';
 import { matchDistrict, ETHIOPIAN_AREAS, type EEUInterruption } from './store';
 import { supabase } from '@/lib/supabase';
 
-const EEU_API_BASE = 'https://www.eeu.gov.et';
+const EEU_API_BASE = 'https://www.eeu.gov.et/api';
+const CHUNK_SIZE = 5;
 const EEU_INTERRUPTION_ENDPOINT = '/power-interruption/latest-power-interruption';
 
 interface EEUApiResponse {
@@ -241,54 +242,59 @@ async function processEEUHtmlResponse(
   }
 
   if (structuredItems.length === 0) {
-    errors.push('Could not extract structured table data from the HTML.');
+    console.log('[Crawler] Structured parsing failed, falling back to direct text extraction via Gemini...');
+    // If structured parsing fails, we pass the raw text to Gemini to see if it can extract anything
+    // We clean up the HTML first to reduce token usage
+    const cleanText = html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+    if (cleanText.length > 100) {
+      const extractedOutages = await extractAllLocationsAndTimesFromHtml(cleanText);
+      if (extractedOutages.length > 0) {
+        return await mapExtractedToInterruptions(extractedOutages, errors, 1, 0);
+      }
+    }
+    
+    errors.push('Could not extract structured data or find outages in raw text.');
     return { total: 0, newEntries: 0, errors, interruptions };
   }
 
-  // Batch into chunks of 5 items so we don't overwhelm Gemini or hit size limits
-  const CHUNK_SIZE = 5;
-  let totalExtracted = 0;
+  return await mapExtractedToInterruptions(structuredItems, errors, CHUNK_SIZE, 0);
+}
 
-  for (let c = 0; c < structuredItems.length; c += CHUNK_SIZE) {
-    const chunk = structuredItems.slice(c, c + CHUNK_SIZE);
-    
-    // Convert this chunk back to a clean string format for Gemini to translate and map
-    // The previous text conversion failed because the prompt expected structured JSON data.
+/**
+ * Shared logic to map Gemini extractions to system records.
+ */
+async function mapExtractedToInterruptions(
+  items: any[],
+  errors: string[],
+  chunkSize: number,
+  initialNewEntries: number
+): Promise<{ total: number; newEntries: number; errors: string[]; interruptions: EEUInterruption[] }> {
+  const interruptions: EEUInterruption[] = [];
+  let newEntries = initialNewEntries;
+  
+  for (let c = 0; c < items.length; c += chunkSize) {
+    const chunk = items.slice(c, c + chunkSize);
     const chunkText = JSON.stringify(chunk, null, 2);
 
-    console.log(`[Crawler] Sending chunk ${(c / CHUNK_SIZE) + 1} to Gemini...`);
+    console.log(`[Crawler] Mapping chunk ${(c / chunkSize) + 1} to database...`);
 
     let extractedOutages: any[] = [];
-    let retries = 3;
-    while (retries > 0) {
-      try {
-        extractedOutages = await extractAllLocationsAndTimesFromHtml(chunkText);
-        break; // Success
-      } catch (err: any) {
-        console.error(`[Crawler] Chunk ${(c / CHUNK_SIZE) + 1} failed (Retries left: ${retries - 1}):`, err?.message || err);
-        retries--;
-        if (retries === 0) {
-          errors.push(`Gemini chunk ${(c / CHUNK_SIZE) + 1} extraction failed completely.`);
-        } else {
-          // Wait 5 seconds before retrying (rate limit handling)
-          await new Promise(res => setTimeout(res, 5000));
-        }
-      }
+    if (chunkSize === 1 && items[0].districts) {
+      // Already extracted (fallback path)
+      extractedOutages = items;
+      c = items.length; // exit loop
+    } else {
+      extractedOutages = await extractAllLocationsAndTimesFromHtml(chunkText);
     }
 
-    totalExtracted += extractedOutages.length;
-
-      // Map Gemini results into our system
-      for (let i = 0; i < extractedOutages.length; i++) {
+    for (let i = 0; i < extractedOutages.length; i++) {
         const outage = extractedOutages[i];
-        
         for (const district of outage.districts) {
           const matched = matchDistrict(district);
-          // Only add if we successfully matched it to a valid geographic area
           if (matched || district.length > 2) {
             const finalDistrict = matched?.district || district;
             const interruption: EEUInterruption = {
-              id: `EEU-HTML-${Date.now()}-${c}-${i}-${finalDistrict.substring(0, 4)}`.toUpperCase(),
+              id: `EEU-SYNC-${Date.now()}-${c}-${i}-${finalDistrict.substring(0, 4)}`.toUpperCase(),
               district: finalDistrict,
               subcity: matched?.subcity || finalDistrict,
               startTime: outage.start_time || new Date().toISOString(),
@@ -296,7 +302,7 @@ async function processEEUHtmlResponse(
               reason: outage.reason || 'EEU Power Interruption',
               sourceUrl: `${EEU_API_BASE}/power-interruption?lang=en`,
               coordinates: matched?.coords || null,
-              translatedFrom: 'Structured EEU Table Data',
+              translatedFrom: 'EEU Website Update',
               fetchedAt: new Date().toISOString(),
               active: true,
               severity: outage.severity || 'moderate',
@@ -305,7 +311,7 @@ async function processEEUHtmlResponse(
             const { data: existing } = await supabase.from('district_history')
               .select('id')
               .eq('district', interruption.district)
-              .gte('start_time', interruption.startTime)
+              .gte('start_time', interruption.startTime.split('T')[0]) // match date part
               .is('end_time', null);
 
             if (!existing || existing.length === 0) {
@@ -326,16 +332,10 @@ async function processEEUHtmlResponse(
           }
         }
       }
-    
-    // Delay between chunks to prevent rate limits
-    await new Promise(res => setTimeout(res, 6000));
+      if (chunkSize > 1) await new Promise(res => setTimeout(res, 6000));
   }
 
-  if (totalExtracted === 0 && structuredItems.length > 0) {
-     errors.push('Gemini processed the data but could not extract any valid map coordinates.');
-  }
-
-  return { total: totalExtracted, newEntries, errors, interruptions };
+  return { total: items.length, newEntries, errors, interruptions };
 }
 
 /**
