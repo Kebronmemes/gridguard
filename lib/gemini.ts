@@ -166,6 +166,8 @@ function delay(ms: number): Promise<void> {
 export async function extractLocationsAndTimes(text: string): Promise<{
   districts: string[];
   times: { start: string; end: string };
+  severity: string;
+  reason_en: string;
 } | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || !text) return null;
@@ -182,7 +184,9 @@ If an area in the text is a smaller neighborhood inside one of these, output the
 Output ONLY valid JSON in this exact format, with no markdown formatting or backticks:
 {
   "districts": ["Name1", "Name2"],
-  "times": { "start": "ISO String or string", "end": "ISO String or string" }
+  "times": { "start": "ISO String or string", "end": "ISO String or string" },
+  "severity": "low" | "moderate" | "critical" | "grid_failure",
+  "reason_en": "English translation of the reason"
 }
 
 Text to analyze:
@@ -208,7 +212,11 @@ ${text}
 
     const parsed = JSON.parse(resultText);
     if (parsed && Array.isArray(parsed.districts) && parsed.times) {
-      return parsed;
+      return {
+        ...parsed,
+        severity: parsed.severity || 'moderate',
+        reason_en: parsed.reason_en || 'Scheduled Maintenance'
+      };
     }
     return null;
   } catch (err) {
@@ -256,7 +264,8 @@ Output ONLY valid JSON in this exact format (an array of objects), with no markd
     "districts": ["English District from the list above"],
     "start_time": "Readable Start info / ISO format",
     "end_time": "Readable End info / ISO format",
-    "reason": "English translation of the reason"
+    "reason": "English translation of the reason",
+    "severity": "low" | "moderate" | "critical" | "grid_failure"
   }
 ]
 
@@ -287,7 +296,10 @@ ${safeText}
 
     const parsed = JSON.parse(resultText);
     if (Array.isArray(parsed)) {
-      return parsed.filter(item => Array.isArray(item.districts) && item.start_time);
+      return parsed.map(item => ({
+        ...item,
+        severity: item.severity || 'moderate'
+      })).filter(item => Array.isArray(item.districts) && item.start_time);
     }
     return [];
   } catch (err) {

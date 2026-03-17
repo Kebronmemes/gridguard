@@ -80,6 +80,7 @@ export interface EEUInterruption {
   translatedFrom: string;  // original Amharic text
   fetchedAt: string;
   active: boolean;
+  severity: string;
 }
 
 // ----- Content Item (blogs, safety guides, alerts) -----

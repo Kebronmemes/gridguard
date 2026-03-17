@@ -120,7 +120,7 @@ async function processEEUJsonResponse(
 
       // Extract district/area info from title and body using Gemini
       const combinedText = title + '\n\n' + body;
-      let extraction = await extractLocationsAndTimes(combinedText);
+      let extraction: { districts: string[]; times: { start: string; end: string; }; severity: string; reason_en: string; } | null = await extractLocationsAndTimes(combinedText);
       
       // Fallback to regex if Gemini fails
       if (!extraction) {
@@ -137,12 +137,13 @@ async function processEEUJsonResponse(
           subcity: matched?.subcity || district,
           startTime: times.start || item.published_date || new Date().toISOString(),
           endTime: times.end || '',
-          reason: title,
+          reason: extraction.reason_en || title,
           sourceUrl: `${EEU_API_BASE}/power-interruption/detail/${item.id}`,
           coordinates: matched?.coords || null,
           translatedFrom: item.title?.am || '',
           fetchedAt: new Date().toISOString(),
           active: true,
+          severity: extraction.severity || 'moderate',
         };
 
         const { data: existing } = await supabase.from('district_history')
@@ -155,7 +156,7 @@ async function processEEUJsonResponse(
             cause: interruption.reason,
             start_time: interruption.startTime,
             type: 'planned',
-            severity: 'moderate',
+            severity: interruption.severity,
             lat: interruption.coordinates?.[0] || 9.0,
             lng: interruption.coordinates?.[1] || 38.75,
             affected_count: 0
@@ -298,6 +299,7 @@ async function processEEUHtmlResponse(
               translatedFrom: 'Structured EEU Table Data',
               fetchedAt: new Date().toISOString(),
               active: true,
+              severity: outage.severity || 'moderate',
             };
 
             const { data: existing } = await supabase.from('district_history')
@@ -313,7 +315,7 @@ async function processEEUHtmlResponse(
                 cause: interruption.reason,
                 start_time: interruption.startTime,
                 type: 'planned',
-                severity: 'moderate',
+                severity: interruption.severity,
                 lat: interruption.coordinates?.[0] || 9.0,
                 lng: interruption.coordinates?.[1] || 38.75,
               });
@@ -342,6 +344,8 @@ async function processEEUHtmlResponse(
 function extractInterruptionDetails(text: string): {
   districts: string[];
   times: { start: string; end: string };
+  severity: string;
+  reason_en: string;
 } {
   const districts: string[] = [];
   const times = { start: '', end: '' };
@@ -379,7 +383,7 @@ function extractInterruptionDetails(text: string): {
     } catch { /* ignore invalid dates */ }
   }
 
-  return { districts, times };
+  return { districts, times, severity: 'moderate', reason_en: 'Scheduled Interruption' };
 }
 
 /**
