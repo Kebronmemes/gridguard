@@ -99,8 +99,11 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true, report: newReport }, { status: 201 });
-  } catch (err) {
-    console.error('Report Auth Error:', err);
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  } catch (err: any) {
+    console.error('Report Error:', err);
+    return NextResponse.json({ 
+      error: 'Invalid request or Database error',
+      details: err.message || 'Unknown error'
+    }, { status: 400 });
   }
 }
