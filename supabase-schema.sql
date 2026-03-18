@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS citizen_reports (
   area TEXT NOT NULL,
   description TEXT,
   severity TEXT DEFAULT 'moderate',
+  status TEXT DEFAULT 'pending',
   lat DOUBLE PRECISION,
   lng DOUBLE PRECISION,
   subcity TEXT,

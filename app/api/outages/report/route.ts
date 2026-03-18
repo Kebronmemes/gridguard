@@ -49,7 +49,8 @@ export async function POST(request: Request) {
         area,
         lat,
         lng,
-        type: severity || 'moderate',
+        subcity: detectedSubcity,
+        severity: severity || 'moderate',
         description: sanitizedDesc,
         status: 'pending'
       })
