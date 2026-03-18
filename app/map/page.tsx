@@ -71,8 +71,13 @@ export default function MapPage() {
         setReportStatus('Success: Report submitted successfully!');
         setReportForm({ area: '', description: '', severity: 'moderate' });
         setTimeout(() => { setShowReportModal(false); setReportStatus(''); }, 2000);
+      } else {
+        setReportStatus(`Error: ${data.details || data.error || 'Check console/database'}`);
       }
-    } catch { setReportStatus('Error: Failed to submit report'); }
+    } catch (err) { 
+      setReportStatus('Error: Network or Configuration error');
+      console.error(err);
+    }
   };
 
   const handleSubscribe = async () => {
@@ -297,9 +302,34 @@ export default function MapPage() {
             <h2 className="text-lg font-bold text-white mb-4">Report Power Outage</h2>
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Area / Location</label>
-                <input value={reportForm.area} onChange={e => setReportForm({ ...reportForm, area: e.target.value })}
-                  className="mt-1 w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder:text-slate-600 focus:border-blue-500 outline-none" placeholder="e.g. Bole, Addis Ababa" />
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Area / Subcity</label>
+                <select value={reportForm.area} onChange={e => setReportForm({ ...reportForm, area: e.target.value })}
+                  className="mt-1 w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-white focus:border-blue-500 outline-none">
+                  <option value="">Select your area...</option>
+                  <optgroup label="Addis Ababa Subcities">
+                    <option value="Bole">Bole</option>
+                    <option value="Yeka">Yeka</option>
+                    <option value="Arada">Arada</option>
+                    <option value="Kirkos">Kirkos</option>
+                    <option value="Lideta">Lideta</option>
+                    <option value="Gulele">Gulele</option>
+                    <option value="Kolfe Keranio">Kolfe Keranio</option>
+                    <option value="Nifas Silk-Lafto">Nifas Silk-Lafto</option>
+                    <option value="Akaki Kaliti">Akaki Kaliti</option>
+                    <option value="Addis Ketema">Addis Ketema</option>
+                    <option value="Lemi Kura">Lemi Kura</option>
+                  </optgroup>
+                  <optgroup label="Major Cities">
+                    <option value="Adama">Adama</option>
+                    <option value="Bahir Dar">Bahir Dar</option>
+                    <option value="Hawassa">Hawassa</option>
+                    <option value="Dire Dawa">Dire Dawa</option>
+                    <option value="Jimma">Jimma</option>
+                    <option value="Mekelle">Mekelle</option>
+                    <option value="Gondar">Gondar</option>
+                    <option value="Debre Birhan">Debre Birhan</option>
+                  </optgroup>
+                </select>
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Severity</label>

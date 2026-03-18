@@ -15,6 +15,13 @@ export async function POST(request: Request) {
   if (!rl.allowed) return NextResponse.json({ error: 'Rate limited.' }, { status: 429 });
 
   try {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json({ 
+        error: 'Missing Supabase Configuration', 
+        details: 'NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set in Vercel environment variables.'
+      }, { status: 400 });
+    }
+
     const data = await request.json();
     const { area, description, severity, coordinates, subcity, district } = data;
 
