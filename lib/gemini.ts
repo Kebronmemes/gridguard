@@ -1,310 +1,209 @@
 // ============================================
-// GridGuard — Gemini Translation Client
+// GridGuard — AI Translation Client (OpenRouter)
 // ============================================
-// Translates Amharic text to English using Google Gemini API (free tier).
-// Includes retry logic with exponential backoff.
+// Uses OpenRouter API (free models) to translate
+// Amharic text and extract outage data from the EEU website.
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-interface GeminiResponse {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{ text?: string }>;
-    };
-  }>;
-  error?: { message: string };
-}
+// Safe + working free models identified by the user
+const AI_MODELS = [
+  'openrouter/free',
+  'stepfun/step-3.5-flash:free',
+  'arcee-ai/trinity-large-preview:free',
+  'arcee-ai/trinity-mini:free'
+];
 
 /**
- * Translate text from Amharic to English using Gemini API.
- * Returns the original text if GEMINI_API_KEY is not set or translation fails.
+ * Call OpenRouter AI with a prompt and get text back.
+ * Randomizes start model and implements backoff on 429.
  */
-export async function translateAmharic(text: string, maxRetries = 3): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
+async function callAI(prompt: string): Promise<string | null> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    console.warn('[Gemini] No API key set (GEMINI_API_KEY). Returning original text.');
-    return text;
+    console.error('[AI] No OPENROUTER_API_KEY set');
+    return null;
   }
 
-  // Skip translation if text appears to already be English
-  if (/^[a-zA-Z0-9\s.,!?;:\-()[\]{}'"]+$/.test(text)) {
-    return text;
-  }
+  // Randomize start model to distribute load
+  const startIdx = Math.floor(Math.random() * AI_MODELS.length);
 
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Translate the following Amharic text to English. Only return the English translation, nothing else. If the text is already in English, return it as-is.\n\nText: ${text}`
-            }]
-          }],
-          generationConfig: {
+  for (let m = 0; m < AI_MODELS.length; m++) {
+    const model = AI_MODELS[(startIdx + m) % AI_MODELS.length];
+    const label = model.split('/')[1] || model;
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        console.log(`[AI] ${label} (attempt ${attempt})...`);
+        
+        const response = await fetch(OPENROUTER_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+            'HTTP-Referer': 'https://gridguard-eight.vercel.app',
+            'X-Title': 'GridGuard',
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'user', content: prompt }],
             temperature: 0.1,
-            maxOutputTokens: 500,
-          }
-        }),
-      });
+          }),
+        });
 
-      if (!response.ok) {
-        const err = await response.text();
-        console.error(`[Gemini] HTTP ${response.status}: ${err}`);
-        if (attempt < maxRetries - 1) {
-          await delay(Math.pow(2, attempt) * 1000); // exponential backoff
+        if (response.status === 429) {
+          const waitMs = 20000 * attempt;
+          console.warn(`[AI] Rate limited on ${label}. Waiting ${waitMs/1000}s...`);
+          await new Promise(r => setTimeout(r, waitMs));
           continue;
         }
-        return text;
-      }
 
-      const data: GeminiResponse = await response.json();
-
-      if (data.error) {
-        console.error(`[Gemini] API error: ${data.error.message}`);
-        if (attempt < maxRetries - 1) {
-          await delay(Math.pow(2, attempt) * 1000);
-          continue;
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error(`[AI] HTTP ${response.status} on ${label}`, errText);
+          break; // try next model
         }
-        return text;
-      }
 
-      const translated = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      if (!translated || translated.length === 0) {
-        console.warn('[Gemini] Empty response, returning original text.');
-        return text;
-      }
-
-      // Sanitize — remove any markdown formatting, special chars
-      return sanitizeTranslation(translated);
-
-    } catch (err) {
-      console.error(`[Gemini] Request failed (attempt ${attempt + 1}):`, err);
-      if (attempt < maxRetries - 1) {
-        await delay(Math.pow(2, attempt) * 1000);
-        continue;
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content?.trim();
+        if (content) {
+          console.log(`[AI] ✅ Got response from ${label}`);
+          return content;
+        }
+      } catch (err) {
+        console.error(`[AI] Request failed for ${label}:`, err);
+        await new Promise(r => setTimeout(r, 10000));
       }
     }
   }
 
-  return text; // fallback to original
+  console.error('[AI] All models failed');
+  return null;
 }
 
 /**
- * Translate multiple texts in batch (for efficiency).
+ * Normalizes place names and reasons using a final AI pass.
  */
-export async function translateBatch(texts: string[]): Promise<string[]> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || texts.length === 0) return texts;
+async function normalizeOutages(outages: any[]): Promise<any[]> {
+  if (outages.length === 0) return [];
+  console.log(`[AI] Normalizing ${outages.length} extracted items...`);
 
-  // For small batches, translate individually
-  if (texts.length <= 3) {
-    return Promise.all(texts.map(t => translateAmharic(t)));
-  }
+  const prompt = `
+Fix Ethiopian place names (e.g., "Addis abeba" -> "Addis Ababa", "bole subcity" -> "Bole").
+Translate reasons to clear English if needed. 
+IMPORTANT: DO NOT remove "reason", DO NOT change "start_time" or "end_time".
+Output ONLY a JSON array.
 
-  // For larger batches, combine into single prompt
-  try {
-    const combined = texts.map((t, i) => `[${i}] ${t}`).join('\n');
-    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `Translate each of the following Amharic lines to English. Return each translation on its own line, prefixed by its index number in brackets. Keep the same format [index] translation.\n\n${combined}`
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 2000,
-        }
-      }),
-    });
+Input:
+${JSON.stringify(outages.slice(0, 50))}
 
-    if (!response.ok) return texts;
+Output ONLY JSON array.`;
 
-    const data: GeminiResponse = await response.json();
-    const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    if (!result) return texts;
-
-    // Parse indexed results
-    const lines = result.split('\n');
-    const translated = [...texts]; // start with originals
-    for (const line of lines) {
-      const match = line.match(/^\[(\d+)\]\s*(.+)$/);
-      if (match) {
-        const idx = parseInt(match[1]);
-        if (idx >= 0 && idx < texts.length) {
-          translated[idx] = sanitizeTranslation(match[2]);
-        }
-      }
-    }
-    return translated;
-  } catch {
-    return texts;
-  }
-}
-
-function sanitizeTranslation(text: string): string {
-  return text
-    .replace(/```[a-z]*\n?/g, '')  // Remove code block markers
-    .replace(/\*\*/g, '')           // Remove bold markers
-    .replace(/\*/g, '')             // Remove italic markers
-    .replace(/<[^>]+>/g, '')        // Remove HTML tags
-    .trim();
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * Intelligently extract structured location and time data from text using Gemini.
- * Maps locations strictly to the known ETHIOPIAN_AREAS list for perfect map rendering.
- */
-export async function extractLocationsAndTimes(text: string): Promise<{
-  districts: string[];
-  times: { start: string; end: string | null };
-  severity: string;
-  reason_en: string;
-} | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || !text) return null;
+  const res = await callAI(prompt);
+  if (!res) return outages;
 
   try {
-    const prompt = `
-Analyze the following text about a scheduled power outage in Ethiopia.
-Extract the start time, end time, and a list of affected areas.
-
-IMPORTANT: You MUST map the affected areas ONLY to this list of known districts/subcities:
-[Bole, Piassa, Merkato, Kazanchis, Sarbet, Megenagna, Ayat, CMC, Akaki Kaliti, Kolfe Keranio, Lideta, Kirkos, Nifas Silk-Lafto, Yeka, Gulele, Arada, Addis Ketema, Bahir Dar, Hawassa, Dire Dawa, Adama, Jimma, Mekelle, Gondar, Dessie, Debre Birhan, Bishoftu, Shashamane, Arba Minch, Woldia]
-If an area in the text is a smaller neighborhood inside one of these, output the parent district from the list above.
-
-Output ONLY valid JSON in this exact format, with no markdown formatting or backticks:
-{
-  "districts": ["Name1", "Name2"],
-  "times": { "start": "ISO String or string", "end": "ISO String or string" },
-  "severity": "low" | "moderate" | "critical" | "grid_failure",
-  "reason_en": "English translation of the reason"
-}
-
-Text to analyze:
-${text}
-`;
-
-    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          responseMimeType: 'application/json',
-        }
-      }),
-    });
-
-    if (!response.ok) return null;
-    const data: GeminiResponse = await response.json();
-    const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    if (!resultText) return null;
-
-    const parsed = JSON.parse(resultText);
-    if (parsed && Array.isArray(parsed.districts) && parsed.times) {
-      return {
-        ...parsed,
-        severity: parsed.severity || 'moderate',
-        reason_en: parsed.reason_en || 'Scheduled Maintenance'
-      };
+    const cleaned = res.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const s = cleaned.indexOf('[');
+    const e = cleaned.lastIndexOf(']');
+    if (s !== -1 && e !== -1) {
+      return JSON.parse(cleaned.substring(s, e + 1));
     }
-    return null;
-  } catch (err) {
-    console.error('[Gemini] Extraction error:', err);
-    return null;
+  } catch (e) {
+    console.warn('[AI] Normalization parse failed');
   }
+  return outages;
 }
 
 /**
- * Parses an entire webpage of text (containing multiple Amharic/English interruption announcements).
- * Translates intent and extracts ALL outages into an array of structured JSON.
+ * Main extraction function: takes raw EEU page text and processes it in chunks.
  */
-export async function extractAllLocationsAndTimesFromHtml(text: string): Promise<Array<{
+export async function extractOutagesFromText(text: string): Promise<Array<{
   districts: string[];
   start_time: string;
   end_time: string | null;
   reason: string;
   severity: string;
 }>> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || !text) return [];
+  if (!text || text.length < 50) return [];
 
-  // Trim to avoid hitting limits if the page is unnecessarily massive
-  const safeText = text.substring(0, 15000); 
+  // Filter for Amharic + Digits to reduce token noise (User preference)
+  const filteredText = text.match(/[\u1200-\u137F0-9\s:/-]+/g)?.join(' ') || '';
+  const cleanText = filteredText.replace(/\s+/g, ' ').trim();
 
-  try {
+  // 1. Split text into chunks of exactly 1000 chars
+  const chunks: string[] = [];
+  const CHUNK_SIZE = 1000;
+  for (let i = 0; i < cleanText.length; i += CHUNK_SIZE) {
+    chunks.push(cleanText.substring(i, i + CHUNK_SIZE));
+  }
+  
+  console.log(`[AI] Processing ${chunks.length} chunks of 1000 chars...`);
+
+  const rawExtracted: any[] = [];
+  const today = new Date().toISOString().split('T')[0];
+
+  // 2. Process each chunk
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    console.log(`[AI] Processing chunk ${i + 1}/${chunks.length}...`);
     const prompt = `
-I am building an outage monitor website and I need you to translate the following power interruption announcement from the Ethiopian Electric Utility.
-The text contains multiple scheduled outages.
+Extract power outages from this Amharic text.
+Map areas to: [Bole, Piassa, Merkato, Kazanchis, Sarbet, Megenagna, Ayat, CMC, Akaki Kaliti, Kolfe Keranio, Lideta, Kirkos, Nifas Silk-Lafto, Yeka, Gulele, Arada, Addis Ketema, Bahir Dar, Hawassa, Dire Dawa, Adama, Jimma, Mekelle, Gondar, Dessie, Debre Birhan, Bishoftu, Shashamane, Arba Minch, Woldia, Debre Markos, Sululta, Sebeta, Burayu, Nekemte, Lemi Kura].
 
-For EACH distinct outage found, you MUST:
-1. Identify the time range. It often follows a "✅" emoji (e.g., ✅ ከጠዋቱ 1:30 - 11:30).
-2. Identify the affected areas. They often follow a "👉" emoji (e.g., 👉አትላስ ሆቴል...).
-3. Translate the Amharic area names and reasons to English.
-4. Convert Ethiopian dates (e.g. መጋቢት 08 ቀን 2018) to Gregorian (e.g. March 17, 2026).
+Translate reason to English. If missing, use "Maintenance".
+Today is ${today}. Output ONLY JSON array:
+[{"districts":["Bole"],"start_time":"2026-03-19T07:30:00Z","end_time":"2026-03-19T17:30:00Z","reason":"Maintenance","severity":"moderate"}]
 
-IMPORTANT GEOGRAPHIC RULES:
-After identifying the English district names, you MUST map the PRIMARY affected district/city ONLY to this strict list:
-[Bole, Piassa, Merkato, Kazanchis, Sarbet, Megenagna, Ayat, CMC, Akaki Kaliti, Kolfe Keranio, Lideta, Kirkos, Nifas Silk-Lafto, Yeka, Gulele, Arada, Addis Ketema, Bahir Dar, Hawassa, Dire Dawa, Adama, Jimma, Mekelle, Gondar, Dessie, Debre Birhan, Bishoftu, Shashamane, Arba Minch, Woldia, Debre Markos, Sululta, Sebeta, Burayu]
+Text:
+${chunk}`;
 
-Output ONLY valid JSON in this exact format (an array of objects):
-[
-  {
-    "districts": ["English District from the list above"],
-    "start_time": "ISO format (YYYY-MM-DDTHH:mm:ssZ)",
-    "end_time": "ISO format (YYYY-MM-DDTHH:mm:ssZ)",
-    "reason": "English translation of why the power is turning off",
-    "severity": "low" | "moderate" | "critical" | "grid_failure"
-  }
-]
-
-Data to analyze:
-${safeText}
-`;
-
-    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          responseMimeType: 'application/json',
+    const result = await callAI(prompt);
+    if (result) {
+      try {
+        const cleaned = result.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+        const startIdx = cleaned.indexOf('[');
+        const endIdx = cleaned.lastIndexOf(']');
+        if (startIdx !== -1 && endIdx !== -1) {
+          const parsed = JSON.parse(cleaned.substring(startIdx, endIdx + 1));
+          if (Array.isArray(parsed)) {
+            parsed.forEach(o => {
+              if (!o.reason) o.reason = 'Maintenance';
+              if (!o.severity) o.severity = 'moderate';
+            });
+            rawExtracted.push(...parsed);
+          }
         }
-      }),
-    });
-
-    if (!response.ok) return [];
-    
-    const data: GeminiResponse = await response.json();
-    const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    if (!resultText) return [];
-
-    // DEBUG: Logging what Gemini responded with
-    console.log("====== GEMINI OUTPUT ====\n", resultText);
-
-    const parsed = JSON.parse(resultText);
-    if (Array.isArray(parsed)) {
-      return parsed.map(item => ({
-        ...item,
-        severity: item.severity || 'moderate'
-      })).filter(item => Array.isArray(item.districts) && item.start_time);
+      } catch (e) {
+        console.warn(`[AI] Chunk ${i+1} parse failed`);
+      }
     }
-    return [];
-  } catch (err) {
-    console.error('[Gemini] Bulk extraction error:', err);
-    return [];
+
+    // Baseline wait of 20s between chunks as specified in user's working test script
+    if (i < chunks.length - 1) {
+      await new Promise(r => setTimeout(r, 20000));
+    }
   }
+
+  if (rawExtracted.length === 0) return [];
+
+  // 3. Deduplicate
+  const unique = [];
+  const seen = new Set();
+  for (const o of rawExtracted) {
+    const key = `${o.start_time}-${o.districts?.join(',')}`;
+    if (!seen.has(key)) {
+      unique.push(o);
+      seen.add(key);
+    }
+  }
+
+  // 4. Final Normalization Pass
+  return await normalizeOutages(unique);
 }
 
-
+// Legacy exports for compatibility
+export const translateAmharic = async (text: string) => text;
+export const translateBatch = async (texts: string[]) => texts;
+export async function extractLocationsAndTimes(text: string) { return null; }
+export async function extractAllLocationsAndTimesFromHtml(text: string) { return extractOutagesFromText(text); }
