@@ -88,7 +88,7 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
 
   useEffect(() => {
     fetchOutages();
-    const interval = setInterval(fetchOutages, 10000); // refresh every 10s
+    const interval = setInterval(fetchOutages, 30000); // refresh every 30s
     return () => clearInterval(interval);
   }, [fetchOutages]);
 
