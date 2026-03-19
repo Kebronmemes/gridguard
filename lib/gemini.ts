@@ -149,11 +149,11 @@ export async function extractOutagesFromText(text: string): Promise<Array<{
     console.log(`[AI] Processing chunk ${i + 1}/${chunks.length}...`);
     const prompt = `
 Extract power outages from this Amharic text.
+ALWAYS translate "reason" to English (e.g., "maintenance", "system failure", "accident").
 Map areas to: [Bole, Piassa, Merkato, Kazanchis, Sarbet, Megenagna, Ayat, CMC, Akaki Kaliti, Kolfe Keranio, Lideta, Kirkos, Nifas Silk-Lafto, Yeka, Gulele, Arada, Addis Ketema, Bahir Dar, Hawassa, Dire Dawa, Adama, Jimma, Mekelle, Gondar, Dessie, Debre Birhan, Bishoftu, Shashamane, Arba Minch, Woldia, Debre Markos, Sululta, Sebeta, Burayu, Nekemte, Lemi Kura].
 
-Translate reason to English. If missing, use "Maintenance".
 Today is ${today}. Output ONLY JSON array:
-[{"districts":["Bole"],"start_time":"2026-03-19T07:30:00Z","end_time":"2026-03-19T17:30:00Z","reason":"Maintenance","severity":"moderate"}]
+[{"districts":["Bole"],"start_time":"2026-03-19T07:30:00Z","end_time":"2026-03-19T17:30:00Z","reason":"Planned Maintenance","severity":"moderate"}]
 
 Text:
 ${chunk}`;
