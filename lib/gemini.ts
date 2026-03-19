@@ -179,7 +179,7 @@ ${chunk}`;
       }
     }
 
-    // Baseline wait of 20s between chunks as specified in user's working test script
+    // Baseline wait of 20s between chunks as requested by user
     if (i < chunks.length - 1) {
       await new Promise(r => setTimeout(r, 20000));
     }

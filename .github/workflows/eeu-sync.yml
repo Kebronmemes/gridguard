@@ -9,8 +9,20 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger EEU Sync
-        run: |
-          curl -sf -X GET \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "https://gridguard-eight.vercel.app/api/cron/eeu-sync"
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install node-fetch dotenv @supabase/supabase-js
+
+      - name: Run EEU Sync Script
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/sync-eeu.js

@@ -71,18 +71,24 @@ export async function crawlEEUInterruptions(): Promise<{
         const lng = matched?.coords[1] || 38.75;
 
         // Check for duplicates (same district in last 24h)
-        const { data: existing } = await supabase
+        const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: existing, error: checkError } = await supabase
           .from('district_history')
           .select('id')
           .eq('district', finalDistrict)
-          .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+          .gte('created_at', dayAgo);
+
+        if (checkError) {
+          console.error(`[Crawler] Error checking duplicates for ${finalDistrict}:`, checkError.message);
+        }
 
         if (existing && existing.length > 0) {
-          console.log(`[Crawler] Skipping duplicate: ${finalDistrict}`);
+          console.log(`[Crawler] Skipping duplicate: ${finalDistrict} (found ${existing.length} recent entry)`);
           continue;
         }
 
         // Insert into district_history
+        console.log(`[Crawler] Inserting ${finalDistrict} into Supabase...`);
         const { error: insertErr } = await supabase.from('district_history').insert({
           district: finalDistrict,
           subcity: matched?.subcity || finalDistrict,
@@ -97,9 +103,12 @@ export async function crawlEEUInterruptions(): Promise<{
         });
 
         if (insertErr) {
-          errors.push(`Failed to insert ${finalDistrict}: ${insertErr.message}`);
+          console.error(`[Crawler] ❌ Failed to insert ${finalDistrict}:`, insertErr.message);
+          errors.push(`Insert failed for ${finalDistrict}: ${insertErr.message}`);
           continue;
         }
+
+        console.log(`[Crawler] ✅ Saved successfully: ${finalDistrict}`);
 
         // Add to system feed
         await supabase.from('system_feed').insert({
