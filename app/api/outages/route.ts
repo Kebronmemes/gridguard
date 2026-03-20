@@ -26,7 +26,10 @@ export async function GET() {
     const now = new Date();
     const activeOutages = allOutages.filter(o => {
       if (!o.end_time) return true; // no end time = still active
-      return new Date(o.end_time) > now; // end time in the future = still active
+      const endTime = new Date(o.end_time);
+      // Show if it's currently active OR if it's a planned outage that hasn't ended yet
+      // OR if it started recently even if ended (showing history for a bit)
+      return endTime > now || o.type === 'planned'; 
     });
 
     const mapped = activeOutages.map(o => ({

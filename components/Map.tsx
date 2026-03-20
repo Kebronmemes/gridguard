@@ -145,27 +145,43 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
             {/* Inner opaque core */}
             <Circle center={o.coordinates as [number, number]} radius={baseRadius * 0.15} pathOptions={{ fillOpacity: 0.9, fillColor: color, weight: 0 }}>
               <Popup>
-                <div className="font-sans min-w-[220px] p-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-bold text-slate-900 text-base">{o.area}</h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                      style={{ backgroundColor: color + '20', color: color }}>
-                      {o.severity.toUpperCase()}
-                    </span>
+                <div className="font-sans min-w-[220px] p-2">
+                  <div className="flex flex-col gap-1 mb-3 border-b border-slate-100 pb-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{TYPE_LABELS[o.type] || o.type}</span>
+                    <h3 className="font-bold text-slate-900 text-lg leading-tight">{o.area}</h3>
                   </div>
-                  <div className="space-y-1.5 text-sm">
-                    <p className="text-slate-600"><span className="font-medium text-slate-800">Type:</span> {TYPE_LABELS[o.type] || o.type}</p>
-                    <p className="text-slate-600"><span className="font-medium text-slate-800">Cause:</span> {o.reason}</p>
-                    <p className="text-slate-600"><span className="font-medium text-slate-800">Reports:</span> {o.reportCount} people affected</p>
-                    <p className="text-slate-600"><span className="font-medium text-slate-800">Started:</span> {new Date(o.startTime).toLocaleTimeString()}</p>
-                    <p className="text-slate-600"><span className="font-medium text-slate-800">ETA Restore:</span> {new Date(o.estimatedRestoreTime).toLocaleTimeString()}</p>
-                    <p className="text-slate-600"><span className="font-medium text-slate-800">Status:</span>
-                      <span className={`ml-1 px-1.5 py-0.5 rounded text-xs font-medium ${o.status === 'active' ? 'bg-red-100 text-red-700' : o.status === 'repair_in_progress' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
-                        {o.status.replace(/_/g, ' ')}
-                      </span>
-                    </p>
+                  
+                  <div className="space-y-3">
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Reason / Cause</p>
+                      <p className="text-slate-800 text-sm font-medium">{o.reason || 'EEU Power Interruption'}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <p className="text-slate-400 font-medium">Status</p>
+                        <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded font-semibold ${o.status === 'active' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {o.status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 font-medium">Severity</p>
+                        <span className="inline-block mt-0.5 font-bold" style={{ color: color }}>
+                          {o.severity.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-100 mt-2">
+                      <p>Started: {new Date(o.startTime).toLocaleString()}</p>
+                      <p className="font-medium text-slate-700">Restore ETA: {new Date(o.estimatedRestoreTime).toLocaleString()}</p>
+                    </div>
+
                     {o.verifiedByStaff && (
-                      <p className="text-green-600 text-xs font-semibold mt-1">✓ Verified by EEU Staff</p>
+                      <div className="flex items-center gap-1.5 text-green-600 text-[10px] font-bold bg-green-50 px-2 py-1 rounded-full w-fit">
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                        VERIFIED BY EEU STAFF
+                      </div>
                     )}
                   </div>
                 </div>
