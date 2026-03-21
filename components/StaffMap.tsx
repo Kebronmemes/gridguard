@@ -31,6 +31,16 @@ export default function StaffInteractiveMap({ token, onRefresh }: { token: strin
     try { const res = await fetch('/api/outages'); const data = await res.json(); setOutages(data.outages || []); } catch {}
   }, []);
 
+  const filteredOutages = useMemo(() => {
+    const seen = new Set();
+    return outages.filter(o => {
+      if (seen.has(o.id)) return false;
+      seen.add(o.id);
+      const area = o.area?.toLowerCase().replace(/\s+/g, '') || '';
+      return !(area === 'addisababa' || area === 'addisabeaba');
+    });
+  }, [outages]);
+
   useEffect(() => { fetchOutages(); const i = setInterval(fetchOutages, 10000); return () => clearInterval(i); }, [fetchOutages]);
 
   const handleQuickCreate = async () => {
@@ -63,52 +73,109 @@ export default function StaffInteractiveMap({ token, onRefresh }: { token: strin
           </defs>
         </svg>
 
-        {outages.map(o => {
+        {filteredOutages.map(o => {
           const radiusMap: Record<string, number> = { low: 1000, moderate: 2000, critical: 3500, grid_failure: 6000 };
           const baseRadius = radiusMap[o.severity] || 2000;
           const color = SEVERITY_COLORS[o.severity] || '#ef4444';
+          const gradId = `grad-${o.severity}`;
 
           if (!o.coordinates) return null;
 
-          return (
-            <LayerGroup key={o.id}>
-              {/* Radar Effect Circles */}
-              <Circle center={o.coordinates as [number, number]} radius={baseRadius * 0.15} pathOptions={{ fillOpacity: 0.9, fillColor: color, weight: 0 }}>
-                <Popup>
-                  <div className="font-sans min-w-[220px] p-2">
-                    <div className="flex flex-col gap-1 mb-3 border-b border-slate-100 pb-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{TYPE_LABELS[o.type] || o.type}</span>
-                      <h3 className="font-bold text-slate-900 text-lg leading-tight">{o.area}</h3>
+          const popupContent = (
+            <Popup>
+              <div className="font-sans min-w-[240px] p-4 text-white">
+                <div className="flex flex-col gap-1 mb-3 border-b border-slate-700/50 pb-3">
+                  <div className="flex justify-between items-start">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{TYPE_LABELS[o.type] || o.type}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase ${o.status === 'active' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                      {o.status}
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-white text-xl leading-tight mt-1">{o.area}</h3>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 shadow-inner">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                      Reason / Cause
+                    </p>
+                    <p className="text-slate-200 text-sm font-semibold">{o.reason || 'EEU Power Interruption'}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-slate-800/30 p-2 rounded-lg border border-slate-700/30">
+                      <p className="text-[9px] text-slate-500 font-bold uppercase">Severity</p>
+                      <p className="text-xs font-black mt-0.5" style={{ color: color }}>
+                        {o.severity.toUpperCase()}
+                      </p>
                     </div>
-                    <div className="space-y-3">
-                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Reason / Cause</p>
-                        <p className="text-slate-800 text-sm font-medium">{o.reason || 'EEU Power Interruption'}</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <p className="text-slate-400 font-medium">Status</p>
-                          <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded font-semibold ${o.status === 'active' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
-                            {o.status.replace(/_/g, ' ')}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="text-slate-400 font-medium">Severity</p>
-                          <span className="inline-block mt-0.5 font-bold" style={{ color: color }}>
-                            {o.severity.toUpperCase()}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-100 mt-2">
-                        <p>ID: {o.id}</p>
-                        <p className="font-medium text-slate-700">Restore ETA: {new Date(o.estimatedRestoreTime).toLocaleString()}</p>
-                      </div>
+                    <div className="bg-slate-800/30 p-2 rounded-lg border border-slate-700/30">
+                      <p className="text-[9px] text-slate-500 font-bold uppercase">Staff Hub ID</p>
+                      <p className="text-[10px] font-mono text-slate-400 mt-0.5 truncate italic">
+                        {o.id.slice(0, 8)}...
+                      </p>
                     </div>
                   </div>
-                </Popup>
+
+                  <div className="space-y-1.5 text-[11px] text-slate-400 bg-slate-900/40 p-2.5 rounded-lg">
+                    <div className="flex justify-between font-bold text-slate-300">
+                      <span>Restore ETA</span>
+                      <span className="text-blue-400">{new Date(o.estimatedRestoreTime).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
+                    </div>
+                  </div>
+
+                  {o.verifiedByStaff && (
+                    <div className="flex items-center gap-2 text-green-400 text-[10px] font-black bg-green-500/10 px-3 py-1.5 rounded-xl border border-green-500/20 w-fit">
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-ping" />
+                      OFFICIAL STAFF VERIFIED
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Popup>
+          );
+
+          return (
+            <LayerGroup key={o.id}>
+              <Circle 
+                center={o.coordinates as [number, number]} 
+                radius={baseRadius * 0.15} 
+                pathOptions={{ 
+                  fillOpacity: 1, 
+                  fillColor: `url(#${gradId})`, 
+                  weight: 2,
+                  color: color
+                }}
+              >
+                {popupContent}
               </Circle>
-              <Circle center={o.coordinates as [number, number]} radius={baseRadius * 0.5} pathOptions={{ fillOpacity: 0.3, fillColor: color, weight: 0 }} />
-              <Circle center={o.coordinates as [number, number]} radius={baseRadius} pathOptions={{ fillOpacity: 0.1, fillColor: color, color: color, weight: 1, dashArray: '4 6' }} />
+              <Circle 
+                center={o.coordinates as [number, number]} 
+                radius={baseRadius * 0.5} 
+                pathOptions={{ 
+                  fillOpacity: 0.25, 
+                  fillColor: color, 
+                  weight: 0,
+                  className: 'radar-pulse-fast'
+                }}
+              >
+                {popupContent}
+              </Circle>
+              <Circle 
+                center={o.coordinates as [number, number]} 
+                radius={baseRadius} 
+                pathOptions={{ 
+                  fillOpacity: 0.1, 
+                  fillColor: color, 
+                  color: color, 
+                  weight: 1, 
+                  dashArray: '4 8',
+                  className: 'radar-pulse-slow'
+                }}
+              >
+                {popupContent}
+              </Circle>
             </LayerGroup>
           );
         })}

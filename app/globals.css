@@ -81,3 +81,44 @@
   height: 100%;
   z-index: 0;
 }
+/* Radar Animations */
+@keyframes radar-pulse {
+  0% { opacity: 0.1; stroke-width: 1px; }
+  50% { opacity: 0.25; stroke-width: 2px; }
+  100% { opacity: 0.1; stroke-width: 1px; }
+}
+
+.radar-pulse-slow {
+  animation: radar-pulse 6s infinite ease-in-out;
+}
+
+.radar-pulse-fast {
+  animation: radar-pulse 3s infinite ease-in-out;
+}
+
+/* Premium Leaflet Popup Styling */
+.leaflet-popup-content-wrapper {
+  background: rgba(15, 23, 42, 0.95) !important;
+  color: #f8fafc !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(51, 65, 85, 0.4);
+  border-radius: 16px !important;
+  padding: 0 !important;
+  overflow: hidden;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  width: auto !important;
+}
+
+.leaflet-popup-tip {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(51, 65, 85, 0.4);
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: #94a3b8 !important;
+  padding: 8px !important;
+}

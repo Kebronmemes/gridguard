@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldAlert, Map as MapIcon, Users, Edit3, LogOut, PlusCircle, CheckCircle, Clock, AlertTriangle, RefreshCw, Zap, Wrench } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -40,6 +40,23 @@ export default function StaffPortal() {
       setCitizenReports(rData.reports || []);
     } catch (e) { console.error(e); }
   }, []);
+
+  const filteredOutages = useMemo(() => {
+    const seen = new Set();
+    return outages.filter(o => {
+      if (seen.has(o.id)) return false;
+      seen.add(o.id);
+      const name = o.area?.toLowerCase().replace(/\s+/g, '') || '';
+      return !(name === 'addisababa' || name === 'addisabeaba');
+    });
+  }, [outages]);
+
+  const filteredReports = useMemo(() => {
+    return citizenReports.filter(r => {
+      const name = r.area?.toLowerCase().replace(/\s+/g, '') || '';
+      return !(name === 'addisababa' || name === 'addisabeaba');
+    });
+  }, [citizenReports]);
 
   useEffect(() => { fetchData(); const i = setInterval(fetchData, 8000); return () => clearInterval(i); }, [fetchData]);
 
@@ -105,7 +122,7 @@ export default function StaffPortal() {
           </h1>
           <div className="flex items-center gap-2">
             <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-            <span className="text-xs text-slate-500">Live • {outages.length} active</span>
+            <span className="text-xs text-slate-500">Live • {filteredOutages.length} active</span>
           </div>
         </header>
 
@@ -113,7 +130,7 @@ export default function StaffPortal() {
           {/* ... tabs ... */}
           {activeTab === 'reports' && (
             <div className="space-y-3">
-              {citizenReports.map(r => (
+              {filteredReports.map(r => (
                 <div key={r.id} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex items-center justify-between">
                   <div className="flex items-start gap-4">
                     <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-blue-400 font-bold">{r.area[0]}</div>
@@ -133,7 +150,7 @@ export default function StaffPortal() {
                   </div>
                 </div>
               ))}
-              {citizenReports.length === 0 && <p className="text-center text-slate-600 py-12">No citizen reports currently in queue</p>}
+              {filteredReports.length === 0 && <p className="text-center text-slate-600 py-12">No citizen reports currently in queue</p>}
             </div>
           )}
 
