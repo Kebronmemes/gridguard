@@ -9,6 +9,7 @@ import type { Outage, FeedItem } from "@/lib/types";
 const StaffInteractiveMap = dynamic(() => import('@/components/StaffMap'), { ssr: false });
 
 export default function StaffPortal() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("map");
   const [user, setUser] = useState<any>(null);
   const [token, setToken] = useState('');
@@ -16,7 +17,13 @@ export default function StaffPortal() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [citizenReports, setCitizenReports] = useState<any[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  // ... existing form states ...
+  const [createForm, setCreateForm] = useState({
+    area: '',
+    reason: '',
+    type: 'emergency',
+    severity: 'moderate'
+  });
+  const [createStatus, setCreateStatus] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
@@ -36,7 +43,45 @@ export default function StaffPortal() {
 
   useEffect(() => { fetchData(); const i = setInterval(fetchData, 8000); return () => clearInterval(i); }, [fetchData]);
 
-  // ... mid sections ...
+  useEffect(() => {
+    const savedToken = localStorage.getItem('staff_token');
+    const savedUser = localStorage.getItem('staff_user');
+    if (savedToken && savedUser) {
+      setToken(savedToken);
+      setUser(JSON.parse(savedUser));
+    } else {
+      router.push('/staff/login');
+    }
+  }, [router]);
+
+  const handleCreate = async () => {
+    if (!createForm.area) {
+      setCreateStatus('Area is required');
+      return;
+    }
+    setCreateStatus('Creating...');
+    try {
+      const res = await fetch('/api/staff/outages', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(createForm),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCreateStatus('Created successfully!');
+        setShowCreateModal(false);
+        fetchData();
+        setCreateForm({ area: '', reason: '', type: 'emergency', severity: 'moderate' });
+      } else {
+        setCreateStatus(data.error || 'Failed to create report');
+      }
+    } catch (e) {
+      setCreateStatus('Error occurred');
+    }
+  };
 
   const sidebarItems = [
     { key: 'map', icon: <MapIcon className="w-5 h-5" />, label: 'Live Grid Map' },
