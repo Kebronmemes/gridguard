@@ -25,58 +25,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Username and password required' }, { status: 400 });
     }
 
-    // Find user in Supabase
-    const { data: user, error } = await supabase
-      .from('staff_users')
-      .select('*')
-      .eq('username', username)
-      .single();
+    // Authenticate with Supabase Auth (GoTrue)
+    // Note: In Supabase, 'email' is the standard identifier.
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: username, // Assuming 'username' field in form contains email
+      password,
+    });
 
-    if (error || !user) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    if (authError || !authData.user) {
+      return NextResponse.json({ error: authError?.message || 'Invalid credentials' }, { status: 401 });
     }
 
-    // In a real app, use bcrypt to compare password_hash.
-    // For this implementation, we are performing a direct string match.
-    if (user.password_hash !== password) {
-      const newAttempts = (user.failed_attempts || 0) + 1;
-      await supabase
-        .from('staff_users')
-        .update({ failed_attempts: newAttempts })
-        .eq('id', user.id);
+    const sbUser = authData.user;
+    const role = sbUser.user_metadata?.role || 'staff';
+    const name = sbUser.user_metadata?.full_name || sbUser.email || 'Staff Member';
 
-      if (newAttempts >= MAX_ATTEMPTS) {
-        return NextResponse.json({
-          error: `Too many failed attempts. Account locked.`,
-          locked: true,
-        }, { status: 429 });
-      }
-
-      return NextResponse.json({
-        error: 'Invalid credentials',
-        attemptsRemaining: MAX_ATTEMPTS - newAttempts,
-      }, { status: 401 });
-    }
-
-    if ((user.failed_attempts || 0) >= MAX_ATTEMPTS) {
-        return NextResponse.json({
-          error: `Account is locked.`,
-          locked: true,
-        }, { status: 429 });
-    }
-
-    // Successful login — reset attempts and update last login
-    await supabase
-      .from('staff_users')
-      .update({ failed_attempts: 0, last_login: new Date().toISOString() })
-      .eq('id', user.id);
-
+    // Successful login — update last login (optional, could be done in a trigger)
     // Create secure HTTP-only session cookie
-    const sessionToken = await encrypt({ id: user.id, username: user.username, role: user.role, name: user.name });
+    const sessionToken = await encrypt({ id: sbUser.id, username: sbUser.email, role, name });
     
     const response = NextResponse.json({
       success: true,
-      user: { id: user.id, username: user.username, role: user.role, name: user.name },
+      user: { id: sbUser.id, username: sbUser.email, role, name },
       token: sessionToken
     });
     

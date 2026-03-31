@@ -159,6 +159,45 @@ ALTER TABLE staff_users       DISABLE ROW LEVEL SECURITY;
 ALTER TABLE staff_locations   DISABLE ROW LEVEL SECURITY;
 ALTER TABLE blog_content      DISABLE ROW LEVEL SECURITY;
 
+-- =====================
+-- 8. predictions
+-- =====================
+-- AI/rule-engine generated outage risk predictions.
+-- Written by cron jobs, read by frontend. NEVER written by user requests.
+CREATE TABLE IF NOT EXISTS predictions (
+  id                   BIGSERIAL PRIMARY KEY,
+  location             TEXT NOT NULL,
+  lat                  DOUBLE PRECISION DEFAULT 9.0,
+  lng                  DOUBLE PRECISION DEFAULT 38.75,
+  risk_level           TEXT DEFAULT 'low',      -- low | medium | high
+  confidence_score     INT DEFAULT 0,            -- 0–100
+  predicted_time_window TEXT,                    -- e.g. "07:00–13:00"
+  reason_summary       TEXT,                     -- plain-text explanation
+  source               TEXT DEFAULT 'rule',      -- 'rule' | 'ai'
+  created_at           TIMESTAMPTZ DEFAULT now(),
+  expires_at           TIMESTAMPTZ DEFAULT (now() + INTERVAL '24 hours')
+);
+CREATE INDEX IF NOT EXISTS idx_pred_location  ON predictions (location);
+CREATE INDEX IF NOT EXISTS idx_pred_risk      ON predictions (risk_level);
+CREATE INDEX IF NOT EXISTS idx_pred_expires   ON predictions (expires_at);
+ALTER TABLE predictions DISABLE ROW LEVEL SECURITY;
+
+-- =====================
+-- 9. activity_logs
+-- =====================
+-- Tracks every significant system event for AI summarization and analytics.
+CREATE TABLE IF NOT EXISTS activity_logs (
+  id          BIGSERIAL PRIMARY KEY,
+  event_type  TEXT NOT NULL,   -- 'outage_started' | 'outage_resolved' | 'citizen_report' | 'prediction_updated' | 'ai_run'
+  location    TEXT,
+  metadata    JSONB DEFAULT '{}',
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_al_event    ON activity_logs (event_type);
+CREATE INDEX IF NOT EXISTS idx_al_location ON activity_logs (location);
+CREATE INDEX IF NOT EXISTS idx_al_time     ON activity_logs (created_at DESC);
+ALTER TABLE activity_logs DISABLE ROW LEVEL SECURITY;
+
 -- ============================================
 -- ✅ DONE — Your database is ready!
 -- ============================================

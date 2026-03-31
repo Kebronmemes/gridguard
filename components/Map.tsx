@@ -1,8 +1,26 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { MapContainer, TileLayer, Polygon, Circle, Popup, useMap, LayerGroup } from "react-leaflet";
+import { MapContainer, TileLayer, Circle, Popup, useMap, LayerGroup } from "react-leaflet";
 import type { Outage } from "@/lib/types";
+
+const RISK_COLORS: Record<string, string> = {
+  low: '#22c55e',
+  medium: '#f59e0b',
+  high: '#ef4444',
+};
+
+interface Prediction {
+  id: number;
+  location: string;
+  lat: number;
+  lng: number;
+  risk_level: 'low' | 'medium' | 'high';
+  confidence_score: number;
+  predicted_time_window: string;
+  reason_summary: string;
+  source: 'rule' | 'ai';
+}
 
 const ADDIS_ABABA: [number, number] = [9.0, 38.75];
 
@@ -75,6 +93,8 @@ function MapController({ flyTo, outages }: { flyTo: [number, number] | null, out
 export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | null }) {
   const [isMounted, setIsMounted] = useState(false);
   const [outages, setOutages] = useState<Outage[]>([]);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [showPredictions, setShowPredictions] = useState(true);
 
   useEffect(() => { setIsMounted(true); }, []);
 
@@ -83,7 +103,24 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
       const res = await fetch('/api/outages');
       const data = await res.json();
       setOutages(data.outages || []);
-    } catch (e) { console.error('Map fetch error', e); }
+      // Cache for offline use
+      try { localStorage.setItem('gg_outages_cache', JSON.stringify(data.outages || [])); } catch {}
+    } catch (e) {
+      console.error('Map fetch error', e);
+      // Offline fallback
+      try {
+        const cached = localStorage.getItem('gg_outages_cache');
+        if (cached) setOutages(JSON.parse(cached));
+      } catch {}
+    }
+  }, []);
+
+  const fetchPredictions = useCallback(async () => {
+    try {
+      const res = await fetch('/api/predictions');
+      const data = await res.json();
+      setPredictions(data.predictions || []);
+    } catch (e) { console.error('Predictions fetch error', e); }
   }, []);
 
   const filteredOutages = useMemo(() => {
@@ -105,9 +142,11 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
 
   useEffect(() => {
     fetchOutages();
-    const interval = setInterval(fetchOutages, 30000); // refresh every 30s
-    return () => clearInterval(interval);
-  }, [fetchOutages]);
+    fetchPredictions();
+    const interval = setInterval(fetchOutages, 30000);
+    const predInterval = setInterval(fetchPredictions, 60000); // Predictions update less frequently
+    return () => { clearInterval(interval); clearInterval(predInterval); };
+  }, [fetchOutages, fetchPredictions]);
 
   if (!isMounted) {
     return (
@@ -204,6 +243,9 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
                     <span>Restore ETA</span>
                     <span className="text-blue-400">{new Date(o.estimatedRestoreTime).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
                   </div>
+                  {(o as any).etaLabel && (
+                    <div className="text-amber-400/80 text-[10px] italic pt-0.5">{(o as any).etaLabel}</div>
+                  )}
                 </div>
 
                 {o.verifiedByStaff && (
@@ -219,10 +261,55 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
 
         return (
           <LayerGroup key={o.id}>
-            {/* Inner opaque core with Gradient */}
+            {/* 1. Rippling Outer Rings (Dynamic based on severity) */}
             <Circle 
               center={o.coordinates as [number, number]} 
-              radius={baseRadius * 0.15} 
+              radius={baseRadius} 
+              pathOptions={{ 
+                fillOpacity: 0.05, 
+                fillColor: color, 
+                color: color, 
+                weight: 1, 
+                dashArray: '5 10',
+                className: `radar-ripple pulse-${o.severity}`
+              }}
+            >
+              {popupContent}
+            </Circle>
+
+            {/* 2. Middle Pulsing Halo */}
+            <Circle 
+              center={o.coordinates as [number, number]} 
+              radius={baseRadius * 0.6} 
+              pathOptions={{ 
+                fillOpacity: 0.15, 
+                fillColor: color, 
+                weight: 0,
+                className: `radar-pulse-${o.severity === 'critical' ? 'fast' : 'slow'} pulse-${o.severity}`
+              }}
+            >
+              {popupContent}
+            </Circle>
+
+            {/* 3. The "Sonar" Sweep Line (SVG overlay simulation) */}
+            <Circle 
+              center={o.coordinates as [number, number]} 
+              radius={baseRadius * 0.8} 
+              pathOptions={{ 
+                fillOpacity: 0, 
+                color: color, 
+                weight: 2, 
+                dashArray: '1 3000', // Creates a single point/line effect
+                className: 'radar-sweep'
+              }}
+            >
+              {popupContent}
+            </Circle>
+            
+            {/* 4. Solid High-Intensity Core */}
+            <Circle 
+              center={o.coordinates as [number, number]} 
+              radius={baseRadius * 0.12} 
               pathOptions={{ 
                 fillOpacity: 1, 
                 fillColor: `url(#${gradId})`, 
@@ -232,39 +319,74 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
             >
               {popupContent}
             </Circle>
-            
-            {/* Middle band with pulsing */}
-            <Circle 
-              center={o.coordinates as [number, number]} 
-              radius={baseRadius * 0.5} 
-              pathOptions={{ 
-                fillOpacity: 0.25, 
-                fillColor: color, 
-                weight: 0,
-                className: 'radar-pulse-fast'
-              }}
-            >
-              {popupContent}
-            </Circle>
-            
-            {/* Outer diffuse halo with pulsing */}
-            <Circle 
-              center={o.coordinates as [number, number]} 
-              radius={baseRadius} 
-              pathOptions={{ 
-                fillOpacity: 0.1, 
-                fillColor: color, 
-                color: color, 
-                weight: 1, 
-                dashArray: '4 8',
-                className: 'radar-pulse-slow'
-              }}
-            >
-              {popupContent}
-            </Circle>
           </LayerGroup>
         );
       })}
+
+      {/* ── PREDICTION RISK LAYER ────────────────────── */}
+      {/* Rendered BELOW live outage radars. Larger, more transparent. */}
+      {showPredictions && predictions
+        .filter(p => p.lat && p.lng)
+        .map(p => {
+          const rColor = RISK_COLORS[p.risk_level] || '#22c55e';
+          const rRadius = p.risk_level === 'high' ? 4500 : p.risk_level === 'medium' ? 3000 : 2000;
+          return (
+            <LayerGroup key={`pred-${p.id}`}>
+              {/* Ghost halo — large, very transparent */}
+              <Circle
+                center={[p.lat, p.lng]}
+                radius={rRadius}
+                pathOptions={{
+                  fillColor: rColor,
+                  fillOpacity: 0.04,
+                  color: rColor,
+                  weight: 0.5,
+                  dashArray: '3 12',
+                }}
+              >
+                <Popup>
+                  <div className="font-sans min-w-[200px] p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: rColor }}>⚠ Predicted Risk</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase" style={{ background: rColor + '22', color: rColor }}>{p.risk_level}</span>
+                    </div>
+                    <h3 className="font-bold text-white text-base mb-1">{p.location.replace(' (AI)', '')}</h3>
+                    <div className="text-[11px] text-slate-400 space-y-1">
+                      <div>🕐 Peak window: <span className="text-slate-200">{p.predicted_time_window}</span></div>
+                      <div>📊 Confidence: <span className="text-slate-200">{p.confidence_score}%</span></div>
+                      <div className="text-[10px] text-slate-500 italic mt-1">{p.reason_summary}</div>
+                      <div className="text-[9px] text-slate-600 uppercase mt-1">{p.source === 'ai' ? '🤖 AI-enhanced' : '📐 Rule engine'}</div>
+                    </div>
+                  </div>
+                </Popup>
+              </Circle>
+            </LayerGroup>
+          );
+        })
+      }
+
+      {/* Prediction toggle button */}
+      <div className="leaflet-bottom leaflet-right" style={{ zIndex: 1000 }}>
+        <div className="leaflet-control" style={{ margin: '0 10px 40px 0' }}>
+          <button
+            onClick={() => setShowPredictions(v => !v)}
+            style={{
+              background: showPredictions ? 'rgba(59,130,246,0.85)' : 'rgba(30,41,59,0.85)',
+              border: '1px solid rgba(59,130,246,0.4)',
+              color: 'white',
+              fontSize: '11px',
+              fontWeight: 600,
+              padding: '5px 10px',
+              borderRadius: '8px',
+              backdropFilter: 'blur(8px)',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {showPredictions ? '🔮 Risk ON' : '🔮 Risk OFF'}
+          </button>
+        </div>
+      </div>
     </MapContainer>
   );
 }

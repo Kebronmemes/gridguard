@@ -4,6 +4,24 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { MapContainer, TileLayer, Circle, Popup, useMapEvents, LayerGroup } from "react-leaflet";
 import type { Outage } from "@/lib/types";
 
+const RISK_COLORS: Record<string, string> = {
+  low: '#22c55e',
+  medium: '#f59e0b',
+  high: '#ef4444',
+};
+
+interface Prediction {
+  id: number;
+  location: string;
+  lat: number;
+  lng: number;
+  risk_level: 'low' | 'medium' | 'high';
+  confidence_score: number;
+  predicted_time_window: string;
+  reason_summary: string;
+  source: 'rule' | 'ai';
+}
+
 const ADDIS_ABABA: [number, number] = [9.0, 38.75];
 const SEVERITY_COLORS: Record<string, string> = {
   low: '#3b82f6', moderate: '#f59e0b', critical: '#ef4444', grid_failure: '#7c2d12',
@@ -21,6 +39,7 @@ function ClickHandler({ onMapClick }: { onMapClick: (pos: [number, number]) => v
 export default function StaffInteractiveMap({ token, onRefresh }: { token: string; onRefresh: () => void }) {
   const [isMounted, setIsMounted] = useState(false);
   const [outages, setOutages] = useState<Outage[]>([]);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [clickedPos, setClickedPos] = useState<[number, number] | null>(null);
   const [quickForm, setQuickForm] = useState({ area: '', reason: '', type: 'emergency', severity: 'critical' });
   const [status, setStatus] = useState('');
@@ -41,7 +60,16 @@ export default function StaffInteractiveMap({ token, onRefresh }: { token: strin
     });
   }, [outages]);
 
-  useEffect(() => { fetchOutages(); const i = setInterval(fetchOutages, 10000); return () => clearInterval(i); }, [fetchOutages]);
+  const fetchPredictions = useCallback(async () => {
+    try { const res = await fetch('/api/predictions'); const data = await res.json(); setPredictions(data.predictions || []); } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchOutages(); fetchPredictions();
+    const i = setInterval(fetchOutages, 10000);
+    const p = setInterval(fetchPredictions, 60000);
+    return () => { clearInterval(i); clearInterval(p); };
+  }, [fetchOutages, fetchPredictions]);
 
   const handleQuickCreate = async () => {
     if (!quickForm.area || !clickedPos) return;
@@ -123,6 +151,9 @@ export default function StaffInteractiveMap({ token, onRefresh }: { token: strin
                       <span>Restore ETA</span>
                       <span className="text-blue-400">{new Date(o.estimatedRestoreTime).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
                     </div>
+                    {(o as any).etaLabel && (
+                      <div className="text-amber-400/80 text-[10px] italic pt-0.5">{(o as any).etaLabel}</div>
+                    )}
                   </div>
 
                   {o.verifiedByStaff && (
@@ -138,9 +169,55 @@ export default function StaffInteractiveMap({ token, onRefresh }: { token: strin
 
           return (
             <LayerGroup key={o.id}>
+              {/* 1. Rippling Outer Rings */}
               <Circle 
                 center={o.coordinates as [number, number]} 
-                radius={baseRadius * 0.15} 
+                radius={baseRadius} 
+                pathOptions={{ 
+                  fillOpacity: 0.05, 
+                  fillColor: color, 
+                  color: color, 
+                  weight: 1, 
+                  dashArray: '5 10',
+                  className: `radar-ripple pulse-${o.severity}`
+                }}
+              >
+                {popupContent}
+              </Circle>
+
+              {/* 2. Middle Pulsing Halo */}
+              <Circle 
+                center={o.coordinates as [number, number]} 
+                radius={baseRadius * 0.6} 
+                pathOptions={{ 
+                  fillOpacity: 0.15, 
+                  fillColor: color, 
+                  weight: 0,
+                  className: `radar-pulse-${o.severity === 'critical' ? 'fast' : 'slow'} pulse-${o.severity}`
+                }}
+              >
+                {popupContent}
+              </Circle>
+
+              {/* 3. The Sonar Sweep */}
+              <Circle 
+                center={o.coordinates as [number, number]} 
+                radius={baseRadius * 0.8} 
+                pathOptions={{ 
+                  fillOpacity: 0, 
+                  color: color, 
+                  weight: 2, 
+                  dashArray: '1 3000',
+                  className: 'radar-sweep'
+                }}
+              >
+                {popupContent}
+              </Circle>
+              
+              {/* 4. Solid Core */}
+              <Circle 
+                center={o.coordinates as [number, number]} 
+                radius={baseRadius * 0.12} 
                 pathOptions={{ 
                   fillOpacity: 1, 
                   fillColor: `url(#${gradId})`, 
@@ -150,35 +227,36 @@ export default function StaffInteractiveMap({ token, onRefresh }: { token: strin
               >
                 {popupContent}
               </Circle>
-              <Circle 
-                center={o.coordinates as [number, number]} 
-                radius={baseRadius * 0.5} 
-                pathOptions={{ 
-                  fillOpacity: 0.25, 
-                  fillColor: color, 
-                  weight: 0,
-                  className: 'radar-pulse-fast'
-                }}
-              >
-                {popupContent}
-              </Circle>
-              <Circle 
-                center={o.coordinates as [number, number]} 
-                radius={baseRadius} 
-                pathOptions={{ 
-                  fillOpacity: 0.1, 
-                  fillColor: color, 
-                  color: color, 
-                  weight: 1, 
-                  dashArray: '4 8',
-                  className: 'radar-pulse-slow'
-                }}
-              >
-                {popupContent}
-              </Circle>
             </LayerGroup>
           );
         })}
+
+        {/* ── PREDICTION RISK LAYER ── */}
+        {predictions
+          .filter(p => p.lat && p.lng)
+          .map(p => {
+            const rColor = RISK_COLORS[p.risk_level] || '#22c55e';
+            const rRadius = p.risk_level === 'high' ? 4500 : p.risk_level === 'medium' ? 3000 : 2000;
+            return (
+              <Circle
+                key={`pred-${p.id}`}
+                center={[p.lat, p.lng]}
+                radius={rRadius}
+                pathOptions={{ fillColor: rColor, fillOpacity: 0.04, color: rColor, weight: 0.5, dashArray: '3 12' }}
+              >
+                <Popup>
+                  <div className="font-sans min-w-[180px] p-2">
+                    <p className="text-[10px] font-bold uppercase" style={{ color: rColor }}>⚠ Risk: {p.risk_level}</p>
+                    <h4 className="font-bold text-sm">{p.location.replace(' (AI)', '')}</h4>
+                    <p className="text-[10px] text-slate-500 mt-1">🕐 {p.predicted_time_window}</p>
+                    <p className="text-[10px] text-slate-500">📊 Confidence: {p.confidence_score}%</p>
+                    <p className="text-[9px] text-slate-600 italic mt-1">{p.reason_summary}</p>
+                  </div>
+                </Popup>
+              </Circle>
+            );
+          })
+        }
 
         {clickedPos && (
           <Circle center={clickedPos} radius={150} pathOptions={{ color: '#22d3ee', fillColor: '#22d3ee', fillOpacity: 0.3, weight: 3, dashArray: '4 4' }}>
@@ -205,8 +283,9 @@ export default function StaffInteractiveMap({ token, onRefresh }: { token: strin
         <h3 className="text-xs font-bold text-slate-300 mb-1.5">Staff Radar HUD</h3>
         <p className="text-[10px] text-slate-500 mb-2">Click map to pin outage. Radars show impact radius.</p>
         <div className="text-[10px] text-slate-400 space-y-0.5">
-          <p>📡 active Radars: {outages.length}</p>
+          <p>📡 Radars: {outages.length}</p>
           <p>🔴 Critical: {outages.filter(o => o.severity === 'critical').length}</p>
+          <p>⚠️ Risk zones: {predictions.length}</p>
         </div>
       </div>
     </>

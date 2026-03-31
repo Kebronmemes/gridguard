@@ -2,8 +2,11 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-const secretKey = process.env.JWT_SECRET || 'gridguard-southwestacademy-2026';
-const key = new TextEncoder().encode(secretKey);
+const secretKey = process.env.JWT_SECRET;
+if (!secretKey) {
+  console.warn('[Auth] JWT_SECRET is not set. Using temporary dev key.');
+}
+const key = new TextEncoder().encode(secretKey || 'gridguard-dev-unsafe-secret');
 
 export async function encrypt(payload: any) {
   return await new SignJWT(payload)

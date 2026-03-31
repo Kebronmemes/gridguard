@@ -4,7 +4,11 @@
 
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_fallback');
+const resendKey = process.env.RESEND_API_KEY;
+if (!resendKey && process.env.NODE_ENV === 'production') {
+    console.error('[Mailer] RESEND_API_KEY is not set!');
+}
+const resend = new Resend(resendKey || 're_dev_dummy');
 
 export interface OutageAlertEmail {
   to: string;

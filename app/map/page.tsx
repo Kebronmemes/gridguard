@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { PowerOff, CheckCircle, Zap, Bell, Clock, TrendingUp, Phone, Mail } from 'lucide-react';
 import AnalyticsDashboard from '@/components/Analytics';
 import LocationSearch from '@/components/LocationSearch';
+import OfflineExport from '@/components/OfflineExport';
 import type { Outage, FeedItem, AnalyticsData } from '@/lib/types';
 
 const InteractiveMap = dynamic(() => import('@/components/Map'), { ssr: false });
@@ -16,6 +17,7 @@ export default function MapPage() {
   const [flyTo, setFlyTo] = useState<[number, number] | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   const [reportForm, setReportForm] = useState({ area: '', description: '', severity: 'moderate' });
   const [reportStatus, setReportStatus] = useState('');
   const [subForm, setSubForm] = useState({ email: '', name: '', area: '' });
@@ -55,7 +57,16 @@ export default function MapPage() {
   useEffect(() => {
     fetchLive();
     const interval = setInterval(fetchLive, 8000);
-    return () => clearInterval(interval);
+    // Track online/offline status
+    const handleOffline = () => setIsOffline(true);
+    const handleOnline = () => setIsOffline(false);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
   }, [fetchLive]);
 
   const handleReport = async () => {
@@ -204,6 +215,12 @@ export default function MapPage() {
                 <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Moderate</div>
                 <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span> Critical</div>
                 <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-red-900"></span> Grid Failure</div>
+                <div className="mt-1 pt-1 border-t border-slate-700/50">
+                  <p className="text-[10px] text-slate-500 uppercase mb-1">Risk Forecast</p>
+                  <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-green-500 opacity-50"></span> Low Risk</div>
+                  <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 opacity-50"></span> Med Risk</div>
+                  <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-red-400 opacity-50"></span> High Risk</div>
+                </div>
               </div>
             </div>
           </div>
@@ -294,6 +311,17 @@ export default function MapPage() {
           </Link>
         </section>
       </main>
+
+      {/* Offline Banner */}
+      {isOffline && (
+        <div className="fixed bottom-0 left-0 right-0 z-[9990] bg-amber-500/90 backdrop-blur text-slate-900 text-xs font-bold text-center py-2 flex items-center justify-center gap-2">
+          <span>📵</span>
+          Offline Mode — Showing cached data. Some features may be unavailable.
+        </div>
+      )}
+
+      {/* Offline Export Button */}
+      <OfflineExport />
 
       {/* Report Modal */}
       {showReportModal && (

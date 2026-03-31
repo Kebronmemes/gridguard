@@ -83,18 +83,45 @@
 }
 /* Radar Animations */
 @keyframes radar-pulse {
-  0% { opacity: 0.1; stroke-width: 1px; }
-  50% { opacity: 0.25; stroke-width: 2px; }
-  100% { opacity: 0.1; stroke-width: 1px; }
+  0% { transform: scale(0.95); opacity: 0.1; }
+  50% { transform: scale(1.05); opacity: 0.3; }
+  100% { transform: scale(0.95); opacity: 0.1; }
+}
+
+@keyframes sonar-sweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes ripple-pulse {
+  0% { transform: scale(0.1); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 0; }
 }
 
 .radar-pulse-slow {
   animation: radar-pulse 6s infinite ease-in-out;
+  transform-origin: center;
 }
 
 .radar-pulse-fast {
   animation: radar-pulse 3s infinite ease-in-out;
+  transform-origin: center;
 }
+
+.radar-sweep {
+  animation: sonar-sweep 4s linear infinite;
+  transform-origin: center;
+}
+
+.radar-ripple {
+  animation: ripple-pulse 3s infinite cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+}
+
+/* Severity-based pulse speeds */
+.pulse-critical { animation-duration: 1.5s; }
+.pulse-moderate { animation-duration: 3s; }
+.pulse-low { animation-duration: 5s; }
 
 /* Premium Leaflet Popup Styling */
 .leaflet-popup-content-wrapper {

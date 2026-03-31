@@ -18,13 +18,13 @@ export default function AdminDashboard() {
   const [formStatus, setFormStatus] = useState("");
 
   useEffect(() => {
-    const t = localStorage.getItem("gridguard_token");
     const u = localStorage.getItem("gridguard_user");
-    if (!t || !u) { router.push("/staff/login"); return; }
+    if (!u) { router.push("/admin/login"); return; }
     const parsed = JSON.parse(u);
-    if (parsed.role !== "admin") { router.push("/staff"); return; }
-    setToken(t);
+    if (parsed.role !== "admin") { router.push("/admin/login"); return; }
     setUser(parsed);
+    // Token is usually in HTTP-only cookie now, but we check local storage for compatibility
+    setToken(localStorage.getItem("gridguard_token") || "");
   }, [router]);
 
   const fetchData = useCallback(async () => {
@@ -53,6 +53,21 @@ export default function AdminDashboard() {
         setTimeout(() => setFormStatus(""), 3000);
       } else setFormStatus(`Error: ${d.error}`);
     } catch { setFormStatus("❌ Failed"); }
+  };
+
+  const handleDeleteStaff = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this staff account? This cannot be undone.")) return;
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "delete_staff", staffId: id }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setFormStatus("Staff member removed.");
+        fetchData();
+      } else setFormStatus(`Error: ${d.error}`);
+    } catch { setFormStatus("❌ Delete failed"); }
   };
 
   const handleAddContent = async () => {
@@ -184,11 +199,34 @@ export default function AdminDashboard() {
               </div>
               {/* Current staff */}
               <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-                <h3 className="text-sm font-bold text-white mb-3">Current Staff ({data?.stats?.totalStaff || 0})</h3>
-                <div className="space-y-2">
-                  {data?.recentFeed?.filter((f: any) => f.message?.includes('staff')).slice(0, 5).map((f: any) => (
-                    <p key={f.id} className="text-xs text-slate-400">{f.message}</p>
+                <h3 className="text-sm font-bold text-white mb-3 flex items-center justify-between">
+                  Registered Staff ({data?.stats?.totalStaff || 0})
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                </h3>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin">
+                  {data?.staffList?.map((s: any) => (
+                    <div key={s.id} className="flex items-center justify-between p-3 bg-slate-900/50 border border-slate-700/30 rounded-xl group transition-all hover:bg-slate-900">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-blue-400">
+                          {s.name?.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-white">{s.name}</p>
+                          <p className="text-[10px] text-slate-500 uppercase tracking-tighter">{s.role} • {s.username}</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => handleDeleteStaff(s.id)}
+                        className="p-2 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all rounded-lg hover:bg-red-500/10"
+                        title="Delete staff account"
+                      >
+                        <ShieldAlert className="w-4 h-4" />
+                      </button>
+                    </div>
                   ))}
+                  {(!data?.staffList || data.staffList.length === 0) && (
+                    <p className="text-center text-xs text-slate-600 py-6 italic">No staff members found.</p>
+                  )}
                 </div>
               </div>
             </div>

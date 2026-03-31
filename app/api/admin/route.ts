@@ -18,9 +18,9 @@ export async function GET(request: Request) {
   const auth = await validateAdmin(request.headers.get('authorization'));
   if (!auth.valid) return NextResponse.json({ error: 'Admin access required' }, { status: 401 });
 
-  // Parallel counts
   const [
     { count: staffCount },
+    { data: staffList }, // Added to get full list
     { count: activeOutages },
     { count: totalReports },
     { count: totalSubs },
@@ -32,6 +32,7 @@ export async function GET(request: Request) {
     { data: citizenReports }
   ] = await Promise.all([
     supabase.from('staff_users').select('*', { count: 'exact', head: true }),
+    supabase.from('staff_users').select('*').order('created_at', { ascending: false }), // Fetch actual users
     supabase.from('district_history').select('*', { count: 'exact', head: true }).is('end_time', null),
     supabase.from('citizen_reports').select('*', { count: 'exact', head: true }),
     supabase.from('subscribers').select('*', { count: 'exact', head: true }),
@@ -83,6 +84,7 @@ export async function GET(request: Request) {
       contentItems: contentCount || 0,
       eeuInterruptions: eeuData.length,
     },
+    staffList: staffList || [], // Return list of staff
     staffLocations,
     recentFeed: recentFeed || [],
     rawSubscriptions: rawSubscriptions || [],
@@ -121,6 +123,20 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true, staff: { username, name, role } }, { status: 201 });
       }
 
+      case 'delete_staff': {
+        const { staffId } = data;
+        if (!staffId) return NextResponse.json({ error: 'Missing staffId' }, { status: 400 });
+
+        // Prevent self-deletion if logged in as admin
+        if (staffId === auth.user.id) return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 });
+
+        const { error } = await supabase.from('staff_users').delete().eq('id', staffId);
+        if (error) throw error;
+
+        await supabase.from('system_feed').insert({ type: 'grid_update', message: `Staff deleted by admin`, area: 'Admin' });
+        return NextResponse.json({ success: true });
+      }
+
       case 'add_content': {
         const { type, title, body } = data;
         if (!type || !title || !body) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
@@ -138,7 +154,8 @@ export async function POST(request: Request) {
       default:
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
-  } catch {
+  } catch (err) {
+    console.error('Admin API error:', err);
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 }

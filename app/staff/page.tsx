@@ -100,6 +100,28 @@ export default function StaffPortal() {
     }
   };
 
+  const handleVerifyReport = async (id: string) => {
+    try {
+      const res = await fetch('/api/staff/reports/moderate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ reportId: id, action: 'verify' }),
+      });
+      if (res.ok) { fetchData(); }
+    } catch (err) { console.error('Verification failed', err); }
+  };
+
+  const handleDismissReport = async (id: string) => {
+    try {
+      const res = await fetch('/api/staff/reports/moderate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ reportId: id, action: 'dismiss' }),
+      });
+      if (res.ok) { fetchData(); }
+    } catch (err) { console.error('Dismissal failed', err); }
+  };
+
   const sidebarItems = [
     { key: 'map', icon: <MapIcon className="w-5 h-5" />, label: 'Live Grid Map' },
     { key: 'incidents', icon: <Edit3 className="w-5 h-5" />, label: 'Incident Management' },
@@ -145,8 +167,19 @@ export default function StaffPortal() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button className="px-3 py-1.5 text-xs bg-red-500/10 text-red-400 rounded-lg border border-red-500/20 hover:bg-red-500/20 transition-colors">Dismiss</button>
-                    <button className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors">Verify</button>
+                    <button 
+                      onClick={() => handleDismissReport(r.id)}
+                      className="px-3 py-1.5 text-xs bg-red-500/10 text-red-400 rounded-lg border border-red-500/20 hover:bg-red-500/20 transition-colors"
+                    >
+                      Dismiss
+                    </button>
+                    <button 
+                      onClick={() => r.status !== 'verified' && handleVerifyReport(r.id)}
+                      disabled={r.status === 'verified'}
+                      className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${r.status === 'verified' ? 'bg-green-500/20 text-green-400 border border-green-500/20 cursor-default' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                    >
+                      {r.status === 'verified' ? 'Verified' : 'Verify'}
+                    </button>
                   </div>
                 </div>
               ))}

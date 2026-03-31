@@ -2,12 +2,22 @@ name: GridGuard EEU Sync
 
 on:
   schedule:
-    - cron: '0 */2 * * *'  # Every 2 hours
-  workflow_dispatch:        # Allow manual trigger from GitHub UI
+    - cron: '*/30 * * * *'   # Scraper: every 30 min
+    - cron: '0 */2 * * *'    # Predictions: every 2 hours (handled by separate job below)
+  workflow_dispatch:
+    inputs:
+      run_ai:
+        description: 'Also run AI enhancement?'
+        required: false
+        default: 'false'
 
 jobs:
+  # ─────────────────────────────────────────
+  # JOB 1: EEU Scraper (every 30 min)
+  # ─────────────────────────────────────────
   sync:
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/30 * * * *'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,3 +36,31 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/sync-eeu.js
+
+  # ─────────────────────────────────────────
+  # JOB 2: Rule-Based Predictions (every 2h)
+  # Calls the serverless prediction cron endpoint.
+  # ─────────────────────────────────────────
+  predictions:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 */2 * * *'
+    steps:
+      - name: Run Rule Engine
+        run: |
+          curl -f -X GET "${{ secrets.VERCEL_URL }}/api/cron/predictions" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"
+
+  # ─────────────────────────────────────────
+  # JOB 3: AI Enhancement (every 6h — limited)
+  # Only runs on even 6h marks to reduce AI quota usage.
+  # ─────────────────────────────────────────
+  ai_predictions:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_ai == 'true'
+    steps:
+      - name: Run AI Prediction Enhancement
+        run: |
+          curl -f -X GET "${{ secrets.VERCEL_URL }}/api/cron/predictions?ai=true" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"
