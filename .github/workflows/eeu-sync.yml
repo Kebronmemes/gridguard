@@ -45,22 +45,37 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 */2 * * *'
     steps:
-      - name: Run Rule Engine
+      - name: Validate Secrets
         run: |
-          curl -f -X GET "${{ secrets.VERCEL_URL }}/api/cron/predictions" \
+          if [ -z "${{ secrets.VERCEL_URL }}" ]; then echo "❌ VERCEL_URL secret is missing!"; exit 1; fi
+          if [ -z "${{ secrets.CRON_SECRET }}" ]; then echo "❌ CRON_SECRET secret is missing!"; exit 1; fi
+
+      - name: Normalize URL & Run Rule Engine
+        run: |
+          # Ensure URL starts with https:// and has no trailing slash
+          URL="${{ secrets.VERCEL_URL }}"
+          [[ $URL != http* ]] && URL="https://$URL"
+          URL="${URL%/}"
+          
+          echo "🚀 Calling: $URL/api/cron/predictions"
+          curl -f -i -X GET "$URL/api/cron/predictions" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json"
 
   # ─────────────────────────────────────────
-  # JOB 3: AI Enhancement (every 6h — limited)
-  # Only runs on even 6h marks to reduce AI quota usage.
+  # JOB 3: AI Enhancement (Manual or Scheduled 6h)
   # ─────────────────────────────────────────
   ai_predictions:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_ai == 'true'
     steps:
-      - name: Run AI Prediction Enhancement
+      - name: Normalize URL & Run AI Enhancement
         run: |
-          curl -f -X GET "${{ secrets.VERCEL_URL }}/api/cron/predictions?ai=true" \
+          URL="${{ secrets.VERCEL_URL }}"
+          [[ $URL != http* ]] && URL="https://$URL"
+          URL="${URL%/}"
+          
+          echo "🤖 Calling AI Enhancement: $URL/api/cron/predictions?ai=true"
+          curl -f -i -X GET "$URL/api/cron/predictions?ai=true" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json"
