@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { MapContainer, TileLayer, Circle, Popup, useMap, LayerGroup } from "react-leaflet";
+import { Zap } from "lucide-react";
 import type { Outage } from "@/lib/types";
+import 'leaflet/dist/leaflet.css';
 
 const RISK_COLORS: Record<string, string> = {
-  low: '#22c55e',
-  medium: '#f59e0b',
-  high: '#ef4444',
+  low: '#22c55e',       // Green (Safe)
+  medium: '#06b6d4',    // Cyan (Moderate storm/risk)
+  high: '#8b5cf6',      // Violet (High probability storm risk)
 };
 
 interface Prediction {
@@ -17,9 +19,11 @@ interface Prediction {
   lng: number;
   risk_level: 'low' | 'medium' | 'high';
   confidence_score: number;
+  probability: number;
   predicted_time_window: string;
   reason_summary: string;
   source: 'rule' | 'ai';
+  weather_impact?: string;
 }
 
 const ADDIS_ABABA: [number, number] = [9.0, 38.75];
@@ -323,39 +327,57 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
         );
       })}
 
-      {/* ── PREDICTION RISK LAYER ────────────────────── */}
-      {/* Rendered BELOW live outage radars. Larger, more transparent. */}
+      {/* ── PREDICTION RISK LAYER (WEATHER + HISTORY) ────────────────────── */}
+      {/* Cyan/Violet color scheme to differentiate from real outages */}
       {showPredictions && predictions
         .filter(p => p.lat && p.lng)
         .map(p => {
-          const rColor = RISK_COLORS[p.risk_level] || '#22c55e';
+          const rColor = RISK_COLORS[p.risk_level] || '#06b6d4';
           const rRadius = p.risk_level === 'high' ? 4500 : p.risk_level === 'medium' ? 3000 : 2000;
           return (
-            <LayerGroup key={`pred-${p.id}`}>
+            <LayerGroup key={`pred-${p.id || p.location}`}>
               {/* Ghost halo — large, very transparent */}
               <Circle
                 center={[p.lat, p.lng]}
                 radius={rRadius}
                 pathOptions={{
                   fillColor: rColor,
-                  fillOpacity: 0.04,
+                  fillOpacity: p.risk_level === 'high' ? 0.15 : 0.08,
                   color: rColor,
-                  weight: 0.5,
-                  dashArray: '3 12',
+                  weight: 1.5,
+                  dashArray: '4 8',
+                  className: 'weather-radar-pulse'
                 }}
               >
                 <Popup>
-                  <div className="font-sans min-w-[200px] p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: rColor }}>⚠ Predicted Risk</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase" style={{ background: rColor + '22', color: rColor }}>{p.risk_level}</span>
+                  <div className="font-sans min-w-[240px] p-4">
+                    <div className="flex items-center justify-between mb-3 border-b border-slate-700/50 pb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1" style={{ color: rColor }}>
+                         Weather Risk
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase" style={{ background: rColor + '22', color: rColor }}>
+                        {p.probability || 0}% PROB
+                      </span>
                     </div>
-                    <h3 className="font-bold text-white text-base mb-1">{p.location.replace(' (AI)', '')}</h3>
-                    <div className="text-[11px] text-slate-400 space-y-1">
-                      <div>🕐 Peak window: <span className="text-slate-200">{p.predicted_time_window}</span></div>
-                      <div>📊 Confidence: <span className="text-slate-200">{p.confidence_score}%</span></div>
-                      <div className="text-[10px] text-slate-500 italic mt-1">{p.reason_summary}</div>
-                      <div className="text-[9px] text-slate-600 uppercase mt-1">{p.source === 'ai' ? '🤖 AI-enhanced' : '📐 Rule engine'}</div>
+                    <h3 className="font-bold text-white text-lg mb-2">{p.location.replace(' (AI)', '')}</h3>
+                    
+                    <div className="space-y-2">
+                      {p.weather_impact && (
+                        <div className="bg-slate-800/80 p-2 rounded-lg border border-slate-700/50">
+                           <p className="text-[9px] text-slate-500 font-bold uppercase mb-0.5">Live Weather Severity</p>
+                           <p className="text-sm font-semibold text-cyan-300">{p.weather_impact}</p>
+                        </div>
+                      )}
+                      
+                      <div className="bg-slate-800/40 p-2 rounded-lg">
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-slate-400">Peak Hours:</span>
+                          <span className="text-slate-200 font-semibold">{p.predicted_time_window}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 italic">
+                          " {p.reason_summary} "
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </Popup>
@@ -381,9 +403,15 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
               backdropFilter: 'blur(8px)',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
             }}
           >
-            {showPredictions ? '🔮 Risk ON' : '🔮 Risk OFF'}
+            <Zap className={`w-4 h-4 ${showPredictions ? 'text-blue-400' : 'text-slate-500'}`} />
+            <span className="hidden sm:inline">
+              {showPredictions ? 'Risk ON' : 'Risk OFF'}
+            </span>
           </button>
         </div>
       </div>

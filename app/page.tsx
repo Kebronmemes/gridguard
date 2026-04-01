@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Zap, ShieldAlert, Users, Globe, MapPin, ArrowRight, BarChart3, Clock, CheckCircle, Bell } from "lucide-react";
+import { Zap, ShieldAlert, Users, Globe, MapPin, ArrowRight, BarChart3, Clock, CheckCircle, Bell, Activity } from "lucide-react";
+import PredictionBoard from "@/components/PredictionBoard";
 
 const fadeIn = {
   hidden: { opacity: 0, y: 30 },
@@ -208,6 +209,9 @@ export default function Home() {
             </Link>
           </div>
         </section>
+
+        {/* Live Predictions Board */}
+        <PredictionBoard />
 
       </main>
 

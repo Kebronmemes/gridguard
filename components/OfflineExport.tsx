@@ -144,7 +144,7 @@ export default function OfflineExport() {
 
                 {exportData && (
                   <div className="text-center text-[10px] text-slate-500 space-y-0.5">
-                    <p>📍 {exportData.outages.length} active • ⚠ {exportData.predictions.length} risk zones</p>
+                    <p>{exportData.outages.length} active • {exportData.predictions.length} risk zones</p>
                   </div>
                 )}
 

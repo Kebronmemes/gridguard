@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Search, MapPin, X, Loader2, Zap, Clock, AlertTriangle, CheckCircle } from "lucide-react";
 import type { Outage } from "@/lib/types";
 
-// Ethiopian districts/areas for local autocomplete fallback
+// Ethiopian districts/areas for local autocomplete (Addis Ababa Focused)
 const ETHIOPIAN_AREAS = [
   { name: "Bole", district: "Addis Ababa", coords: [8.9806, 38.7578] },
   { name: "Yeka", district: "Addis Ababa", coords: [9.0350, 38.8000] },
@@ -23,19 +23,10 @@ const ETHIOPIAN_AREAS = [
   { name: "Megenagna", district: "Addis Ababa", coords: [9.0190, 38.7890] },
   { name: "Ayat", district: "Addis Ababa", coords: [9.0400, 38.8200] },
   { name: "CMC", district: "Addis Ababa", coords: [9.0280, 38.8030] },
-  { name: "Bahir Dar", district: "Amhara", coords: [11.5742, 37.3614] },
-  { name: "Hawassa", district: "Sidama", coords: [7.0504, 38.4955] },
-  { name: "Dire Dawa", district: "Dire Dawa", coords: [9.6009, 41.8501] },
-  { name: "Adama", district: "Oromia", coords: [8.5400, 39.2700] },
-  { name: "Jimma", district: "Oromia", coords: [7.6667, 36.8333] },
-  { name: "Mekelle", district: "Tigray", coords: [13.4967, 39.4753] },
-  { name: "Gondar", district: "Amhara", coords: [12.6030, 37.4521] },
-  { name: "Dessie", district: "Amhara", coords: [11.1333, 39.6333] },
-  { name: "Bishoftu", district: "Oromia", coords: [8.7500, 38.9833] },
-  { name: "Shashamane", district: "Oromia", coords: [7.2000, 38.6000] },
-  { name: "Hosaena", district: "SNNPR", coords: [7.5500, 37.8500] },
-  { name: "Arba Minch", district: "SNNPR", coords: [6.0333, 37.5500] },
-  { name: "Harar", district: "Harari", coords: [9.3100, 42.1200] },
+  { name: "Garment", district: "Addis Ababa", coords: [8.9663, 38.7410] },
+  { name: "Mebrat Haile", district: "Addis Ababa", coords: [8.9550, 38.7300] },
+  { name: "Bulbula", district: "Addis Ababa", coords: [8.9720, 38.7850] },
+  { name: "Jomo", district: "Addis Ababa", coords: [8.9600, 38.7000] },
 ];
 
 interface LocationSearchProps {

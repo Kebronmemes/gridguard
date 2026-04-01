@@ -9,7 +9,9 @@ import path from 'path';
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
 
-dotenv.config({ path: path.join(process.cwd(), '.env.local') });
+import { fileURLToPath } from 'url';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '../.env.local') });
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -25,10 +27,10 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ⚡ Same models as user's working test_pipeline
+// ⚡ Reliability-first models (Stepfun is very stable for free usage)
 const AI_MODELS = [
-  'openrouter/free',
   'stepfun/step-3.5-flash:free',
+  'openrouter/free',
   'arcee-ai/trinity-large-preview:free',
   'arcee-ai/trinity-mini:free'
 ];
@@ -122,10 +124,10 @@ async function main() {
   text = text.match(/[\u1200-\u137F0-9\s:/-]+/g)?.join(' ').replace(/\s+/g, ' ').trim() || '';
   console.log(`🧹 Extracted ${text.length} chars of data`);
 
-  // 3. Chunking (1000ch)
+  // 3. Reliable Chunking (1500ch - User Request)
   const chunks = [];
-  for (let i = 0; i < text.length; i += 1000) {
-    chunks.push(text.substring(i, i + 1000));
+  for (let i = 0; i < text.length; i += 1500) {
+    chunks.push(text.substring(i, i + 1500));
   }
   console.log(`📦 Sliced into ${chunks.length} chunks`);
 
@@ -139,8 +141,11 @@ async function main() {
 Extract power outages from this Amharic text.
 ALWAYS translate "reason" to English (e.g., "maintenance", "system failure", "accident").
 Map districts to correct subcities if possible.
-Today: ${today}. Output ONLY JSON array:
+Today is ${today}. 
+
+Output ONLY a JSON array in this format:
 [{"districts":["Bole"],"area":"Bole","start_time":"2026-03-19T07:30:00Z","end_time":"2026-03-19T17:30:00Z","reason":"Planned Maintenance"}]
+
 Text:
 ${chunks[i]}
 `;
@@ -156,8 +161,12 @@ ${chunks[i]}
         }
       } catch (e) { console.error('❌ JSON Parse Error in chunk:', e.message); }
     }
-    // Baseline 5s wait strictly for stability, but much faster
-    if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 5000));
+    
+    // Mandatory 10s delay to prevent AI rate limits
+    if (i < chunks.length - 1) {
+      console.log('⏳ Waiting 10s for next request...');
+      await new Promise(r => setTimeout(r, 10000));
+    }
   }
 
   if (rawResults.length === 0) {
@@ -166,8 +175,10 @@ ${chunks[i]}
   }
 
   // 5. Normalization Pass (Translate & Fix Names)
-  console.log('\n🧠 Final Normalization & Translation Pass...');
-  const finalPrompt = `
+  let finalOutages = rawResults;
+  if (rawResults.length >= 5) {
+    console.log('\n🧠 Final Normalization & Translation Pass...');
+    const finalPrompt = `
 Translate ALL "reason" fields to clean English. Fix Ethiopian district names.
 Rules:
 - DO NOT remove "reason"
@@ -177,16 +188,16 @@ ${JSON.stringify(rawResults.slice(0, 50))}
 Output ONLY JSON array.
 `;
 
-  const finalRes = await callAI(finalPrompt);
-  let finalOutages = rawResults;
-  if (finalRes) {
-    try {
-      const cleaned = finalRes.replace(/```json/gi, '').replace(/```/g, '').trim();
-      const s = cleaned.indexOf('['), e = cleaned.lastIndexOf(']');
-      if (s !== -1 && e !== -1) {
-        finalOutages = JSON.parse(cleaned.substring(s, e + 1));
-      }
-    } catch { }
+    const finalRes = await callAI(finalPrompt);
+    if (finalRes) {
+      try {
+        const cleaned = finalRes.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const s = cleaned.indexOf('['), e = cleaned.lastIndexOf(']');
+        if (s !== -1 && e !== -1) {
+          finalOutages = JSON.parse(cleaned.substring(s, e + 1));
+        }
+      } catch { }
+    }
   }
 
   // 6. Insertion with Fuzzy Matching

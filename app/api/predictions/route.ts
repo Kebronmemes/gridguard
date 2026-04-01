@@ -16,7 +16,7 @@ export async function GET() {
     // Only return non-expired predictions
     const { data: predictions, error } = await supabase
       .from('predictions')
-      .select('id, location, lat, lng, risk_level, confidence_score, predicted_time_window, reason_summary, source, created_at')
+      .select('id, location, lat, lng, risk_level, confidence_score, probability, predicted_time_window, reason_summary, source, weather_impact, created_at')
       .gt('expires_at', now)
       .order('confidence_score', { ascending: false })
       .limit(50);

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { MapContainer, TileLayer, Circle, Popup, useMapEvents, LayerGroup } from "react-leaflet";
+import { AlertTriangle, Clock, Zap, Activity, Info, BarChart3, Search, Calendar, MapPin, Gauge } from 'lucide-react';
 import type { Outage } from "@/lib/types";
 
 const RISK_COLORS: Record<string, string> = {
@@ -246,10 +247,10 @@ export default function StaffInteractiveMap({ token, onRefresh }: { token: strin
               >
                 <Popup>
                   <div className="font-sans min-w-[180px] p-2">
-                    <p className="text-[10px] font-bold uppercase" style={{ color: rColor }}>⚠ Risk: {p.risk_level}</p>
+                    <p className="text-[10px] font-bold uppercase flex items-center gap-1" style={{ color: rColor }}>Risk: {p.risk_level}</p>
                     <h4 className="font-bold text-sm">{p.location.replace(' (AI)', '')}</h4>
-                    <p className="text-[10px] text-slate-500 mt-1">🕐 {p.predicted_time_window}</p>
-                    <p className="text-[10px] text-slate-500">📊 Confidence: {p.confidence_score}%</p>
+                    <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">Time: {p.predicted_time_window}</p>
+                    <p className="text-[10px] text-slate-500 flex items-center gap-1">Confidence: {p.confidence_score}%</p>
                     <p className="text-[9px] text-slate-600 italic mt-1">{p.reason_summary}</p>
                   </div>
                 </Popup>
@@ -283,9 +284,9 @@ export default function StaffInteractiveMap({ token, onRefresh }: { token: strin
         <h3 className="text-xs font-bold text-slate-300 mb-1.5">Staff Radar HUD</h3>
         <p className="text-[10px] text-slate-500 mb-2">Click map to pin outage. Radars show impact radius.</p>
         <div className="text-[10px] text-slate-400 space-y-0.5">
-          <p>📡 Radars: {outages.length}</p>
-          <p>🔴 Critical: {outages.filter(o => o.severity === 'critical').length}</p>
-          <p>⚠️ Risk zones: {predictions.length}</p>
+          <p>Radars: {outages.length}</p>
+          <p>Critical: {outages.filter(o => o.severity === 'critical').length}</p>
+          <p>Risk zones: {predictions.length}</p>
         </div>
       </div>
     </>
