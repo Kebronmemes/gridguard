@@ -136,8 +136,8 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
       const area = o.area?.toLowerCase().replace(/\s+/g, '') || '';
       const district = o.district?.toLowerCase().replace(/\s+/g, '') || '';
       
-      // Filter out generic city-wide entries
-      const isAddis = area === 'addisababa' || area === 'addisabeaba' || district === 'addisababa';
+      // Filter out only if the detailed area itself is explicitly just "Addis Ababa"
+      const isAddis = area === 'addisababa' || area === 'addisabeaba';
       if (isAddis) return false;
       
       return true;

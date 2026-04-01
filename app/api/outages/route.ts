@@ -79,11 +79,20 @@ export async function GET() {
         }
       }
 
+      // Add slight variance to unmapped defaults so they don't stack fully invisibly
+      let outLat = o.lat || 9.0;
+      let outLng = o.lng || 38.75;
+      if (outLat === 9.0 && outLng === 38.75) {
+        // Random offset ~4km around the center
+        outLat += (Math.random() - 0.5) * 0.04;
+        outLng += (Math.random() - 0.5) * 0.04;
+      }
+
       return {
         id: o.id,
-        area: o.district,
+        area: o.area && o.area !== o.district ? o.area : o.district,
         district: o.subcity || o.district,
-        coordinates: (o.lat && o.lng) ? [o.lat, o.lng] : [9.0, 38.75],
+        coordinates: [outLat, outLng],
         type: o.type || 'planned',
         severity: o.severity || 'moderate',
         status: 'active',
