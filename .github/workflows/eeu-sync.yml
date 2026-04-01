@@ -1,82 +1,73 @@
-name: GridGuard EEU Sync
+name: ⚡ GridGuard Master Engine
 
 on:
   schedule:
-    - cron: '*/30 * * * *'   # Scraper: every 30 min
-    - cron: '0 */2 * * *'    # Predictions: every 2 hours (handled by separate job below)
+    - cron: '*/30 * * * *'   # Job: sync (Every 30 min)
+    - cron: '0 * * * *'      # Job: predict (Every hour)
+    - cron: '0 */6 * * *'    # Job: ai-predict (Every 6 hours)
+    - cron: '0 0 1 */4 *'    # Job: map-districts (Every 4 months)
   workflow_dispatch:
     inputs:
-      run_ai:
-        description: 'Also run AI enhancement?'
-        required: false
-        default: 'false'
+      action:
+        description: 'Manual Action to Trigger'
+        required: true
+        default: 'sync'
+        type: choice
+        options:
+          - sync
+          - predict
+          - ai-predict
+          - map-districts
 
 jobs:
-  # ─────────────────────────────────────────
-  # JOB 1: EEU Scraper (every 30 min)
-  # ─────────────────────────────────────────
+  # 1. EEU Website Scraper (Every 30 mins)
   sync:
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/30 * * * *'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'sync' || github.event.schedule == '*/30 * * * *'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm install node-fetch dotenv @supabase/supabase-js
-
-      - name: Run EEU Sync Script
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+      - run: npm install node-fetch dotenv @supabase/supabase-js
+      - name: 🚀 Sync EEU Data
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/sync-eeu.js
 
-  # ─────────────────────────────────────────
-  # JOB 2: Rule-Based Predictions (every 2h)
-  # Calls the serverless prediction cron endpoint.
-  # ─────────────────────────────────────────
-  predictions:
+  # 2. Weather-Aware Predictor (Hourly)
+  predict:
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 */2 * * *'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'predict' || github.event.schedule == '0 * * * *'
     steps:
-      - name: Validate Secrets
+      - name: 🔮 Trigger Rule Engine
         run: |
-          if [ -z "${{ secrets.VERCEL_URL }}" ]; then echo "❌ VERCEL_URL secret is missing!"; exit 1; fi
-          if [ -z "${{ secrets.CRON_SECRET }}" ]; then echo "❌ CRON_SECRET secret is missing!"; exit 1; fi
+          curl -f -X GET "https://gridguard-eight.vercel.app/api/cron/predictions?ai=false" \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
-      - name: Normalize URL & Run Rule Engine
-        run: |
-          # Ensure URL starts with https:// and has no trailing slash
-          URL="${{ secrets.VERCEL_URL }}"
-          [[ $URL != http* ]] && URL="https://$URL"
-          URL="${URL%/}"
-          
-          echo "🚀 Calling: $URL/api/cron/predictions"
-          curl -f -i -X GET "$URL/api/cron/predictions" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json"
-
-  # ─────────────────────────────────────────
-  # JOB 3: AI Enhancement (Manual or Scheduled 6h)
-  # ─────────────────────────────────────────
-  ai_predictions:
+  # 3. Deep AI Analysis (6 Hours)
+  ai-predict:
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_ai == 'true'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'ai-predict' || github.event.schedule == '0 */6 * * *'
     steps:
-      - name: Normalize URL & Run AI Enhancement
+      - name: 🤖 Trigger AI Enhancement
         run: |
-          URL="${{ secrets.VERCEL_URL }}"
-          [[ $URL != http* ]] && URL="https://$URL"
-          URL="${URL%/}"
-          
-          echo "🤖 Calling AI Enhancement: $URL/api/cron/predictions?ai=true"
-          curl -f -i -X GET "$URL/api/cron/predictions?ai=true" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json"
+          curl -f -X GET "https://gridguard-eight.vercel.app/api/cron/predictions?ai=true" \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  # 4. AI District Mapper (4 Months)
+  map-districts:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'map-districts' || github.event.schedule == '0 0 1 */4 *'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+      - run: npm install node-fetch dotenv @supabase/supabase-js
+      - name: 🗺️ Map Addis Neighborhoods
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/seed-districts.js

@@ -271,28 +271,35 @@ Output ONLY the raw JSON array. No text.`;
 
     const aiInsights: Array<any> = JSON.parse(cleaned.substring(s, e + 1));
 
+    // 3. Match AI insights to DB districts for coordinates
+    const { data: dbDistricts } = await supabase.from('districts').select('*');
     const expiresAt = new Date(Date.now() + 6 * 3600 * 1000).toISOString();
 
     for (const insight of aiInsights) {
-      const areaInfo = ETHIOPIAN_AREAS.find(
-        a => a.area.toLowerCase() === insight.area?.toLowerCase()
+      // Fuzzy match or exact match
+      const dist = dbDistricts?.find(
+        d => d.name.toLowerCase() === insight.area?.toLowerCase()
       );
-      if (!areaInfo) continue;
+      
+      if (!dist) {
+        console.warn(`[Predictor] AI suggested area "${insight.area}" not found in districts table. Skipping.`);
+        continue;
+      }
 
       // Reason summary now includes manpower and punctuality insights
       const complexSummary = `🤖 AI DETECTION: ${insight.insight} | 👷 Manpower: ${insight.manpower} | ⏱ Punctuality Risk: ${insight.punctuality_reason}`;
 
-      await supabase.from('predictions').insert({
+      await supabase.from('predictions').upsert({
         location: `${insight.area} (AI Analysis)`,
-        lat: areaInfo.coords[0],
-        lng: areaInfo.coords[1],
+        lat: dist.lat,
+        lng: dist.lng,
         risk_level: insight.risk_level === 'high' ? 'high' : 'medium',
         confidence_score: insight.risk_level === 'high' ? 88 : 68,
         predicted_time_window: insight.peak_hours || 'Varies',
         reason_summary: complexSummary,
         source: 'ai',
         expires_at: expiresAt,
-      });
+      }, { onConflict: 'location' });
     }
 
     await supabase.from('activity_logs').insert({
