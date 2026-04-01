@@ -40,11 +40,11 @@ export async function GET() {
 
     if (error) {
       console.error('Supabase outages error:', error);
-      return NextResponse.json({ outages: [], timestamp: new Date().toISOString() });
+      return NextResponse.json({ outages: [], error: error.message, hint: error.hint, code: error.code, timestamp: new Date().toISOString() });
     }
 
     if (!allOutages || allOutages.length === 0) {
-      return NextResponse.json({ outages: [], timestamp: new Date().toISOString() });
+      return NextResponse.json({ outages: [], debug: 'no_rows_returned', timestamp: new Date().toISOString() });
     }
 
     const now = new Date();
