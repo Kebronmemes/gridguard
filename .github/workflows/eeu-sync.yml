@@ -2,29 +2,18 @@ name: ⚡ GridGuard Master Engine
 
 on:
   schedule:
-    - cron: '*/30 * * * *'   # Job: sync (Every 30 min)
-    - cron: '0 * * * *'      # Job: predict (Every hour)
-    - cron: '0 */6 * * *'    # Job: ai-predict (Every 6 hours)
-    - cron: '0 0 1 */4 *'    # Job: map-districts (Every 4 months)
-  workflow_dispatch:
-    inputs:
-      action:
-        description: 'Manual Action to Trigger'
-        required: true
-        default: 'sync'
-        type: choice
-        options:
-          - sync
-          - predict
-          - ai-predict
-          - map-districts
+    - cron: '*/30 * * * *'   # sync runs every 30 min
+    - cron: '0 * * * *'      # predict runs every hour
+    - cron: '0 */6 * * *'    # ai-predict runs every 6 hours
+    - cron: '0 0 1 */4 *'    # map-districts runs every 4 months
+  workflow_dispatch:          # Manual trigger — runs ALL jobs
 
 jobs:
-  # 1. EEU Website Scraper (Every 30 mins)
+  # ── Step 1: Scrape EEU website & save to Supabase ──
   sync:
     runs-on: ubuntu-latest
     timeout-minutes: 8
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'sync' || github.event.schedule == '*/30 * * * *'
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/30 * * * *'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,33 +26,36 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/sync-eeu.js
 
-  # 2. Weather-Aware Predictor (Hourly)
+  # ── Step 2: Rule-based predictions (runs after sync completes) ──
   predict:
     runs-on: ubuntu-latest
     timeout-minutes: 3
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'predict' || github.event.schedule == '0 * * * *'
+    needs: sync
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event.schedule == '0 * * * *')
     steps:
       - name: 🔮 Trigger Rule Engine
         run: |
           curl -f -X GET "https://gridguard-eight.vercel.app/api/cron/predictions?ai=false" \
           -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
-  # 3. Deep AI Analysis (6 Hours)
+  # ── Step 3: AI-enhanced predictions (runs after sync completes) ──
   ai-predict:
     runs-on: ubuntu-latest
     timeout-minutes: 3
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'ai-predict' || github.event.schedule == '0 */6 * * *'
+    needs: sync
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event.schedule == '0 */6 * * *')
     steps:
       - name: 🤖 Trigger AI Enhancement
         run: |
           curl -f -X GET "https://gridguard-eight.vercel.app/api/cron/predictions?ai=true" \
           -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
-  # 4. AI District Mapper (4 Months)
+  # ── Step 4: District mapping (runs after sync completes) ──
   map-districts:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'map-districts' || github.event.schedule == '0 0 1 */4 *'
+    needs: sync
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event.schedule == '0 0 1 */4 *')
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
