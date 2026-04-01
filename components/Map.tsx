@@ -205,59 +205,33 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
           <Popup>
             <div className="font-sans min-w-[240px] p-4">
               <div className="flex flex-col gap-1 mb-3 border-b border-slate-700/50 pb-3">
-                <div className="flex justify-between items-start">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{TYPE_LABELS[o.type] || o.type}</span>
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase ${o.status === 'active' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                    {o.status}
-                  </span>
-                </div>
-                <h3 className="font-bold text-white text-xl leading-tight mt-1">{o.area}</h3>
+                <h3 className="font-bold text-white text-xl leading-tight mt-1 pt-2">{o.area}</h3>
               </div>
               
               <div className="space-y-4">
-                <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 shadow-inner">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                    Reason / Cause
-                  </p>
-                  <p className="text-slate-200 text-sm font-semibold">{o.reason || 'EEU Power Interruption'}</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-slate-800/30 p-2 rounded-lg border border-slate-700/30">
-                    <p className="text-[9px] text-slate-500 font-bold uppercase">Severity</p>
-                    <p className="text-xs font-black mt-0.5" style={{ color: color }}>
-                      {o.severity.toUpperCase()}
-                    </p>
-                  </div>
-                  <div className="bg-slate-800/30 p-2 rounded-lg border border-slate-700/30">
-                    <p className="text-[9px] text-slate-500 font-bold uppercase">Impact Score</p>
-                    <p className="text-xs font-black text-white mt-0.5">
-                      {Math.round(baseRadius / 100)}/60
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 text-[11px] text-slate-400 bg-slate-900/40 p-2.5 rounded-lg">
-                  <div className="flex justify-between">
-                    <span>Started</span>
-                    <span className="text-slate-300">{new Date(o.startTime).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-slate-300">
-                    <span>Restore ETA</span>
-                    <span className="text-blue-400">{new Date(o.estimatedRestoreTime).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
-                  </div>
-                  {(o as any).etaLabel && (
-                    <div className="text-amber-400/80 text-[10px] italic pt-0.5">{(o as any).etaLabel}</div>
-                  )}
-                </div>
-
-                {o.verifiedByStaff && (
-                  <div className="flex items-center gap-2 text-green-400 text-[10px] font-black bg-green-500/10 px-3 py-1.5 rounded-xl border border-green-500/20 w-fit">
-                    <span className="w-2 h-2 bg-green-500 rounded-full animate-ping" />
-                    OFFICIAL STAFF VERIFIED
+                {o.weather && o.weather.condition !== 'Unknown' && (
+                  <div className="bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/50 flex gap-3 text-xs shadow-inner">
+                    <div className="flex flex-col border-r border-slate-700 pr-3">
+                      <span className="text-[9px] text-slate-500 uppercase font-bold uppercase tracking-wider">Weather</span>
+                      <span className={`font-semibold ${o.weather.condition.includes('Rain') ? 'text-blue-400' : 'text-slate-300'}`}>{o.weather.condition}</span>
+                    </div>
+                    <div className="flex flex-col flex-1 pl-1">
+                      <span className="text-[9px] text-slate-500 uppercase font-bold uppercase tracking-wider">Conditions</span>
+                      <span className="text-slate-400">Wind: {o.weather.wind} km/h • Rain: {o.weather.rain} mm</span>
+                    </div>
                   </div>
                 )}
+
+                <div className="space-y-1.5 text-[11px] text-slate-400 bg-slate-900/40 p-2.5 rounded-lg">
+                  <div className="flex justify-between border-b border-slate-800 pb-1.5 mb-1.5">
+                    <span className="uppercase text-[9px] font-bold text-slate-500">Planned Start</span>
+                    <span className="text-slate-300 font-medium">{new Date(o.startTime).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-slate-300">
+                    <span className="uppercase text-[9px] text-slate-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"/> AI Prediction ETA</span>
+                    <span className="text-blue-400">{new Date(o.estimatedRestoreTime).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </Popup>

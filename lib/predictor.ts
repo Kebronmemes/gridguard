@@ -21,7 +21,7 @@ export interface PredictionResult {
 }
 
 // ---- Real Weather Intelligence (Open-Meteo) ----
-async function getRealWeather(lat: number, lng: number) {
+export async function getRealWeather(lat: number, lng: number) {
   try {
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=precipitation,wind_speed_10m,weather_code`);
     if (!res.ok) throw new Error('Weather API error');

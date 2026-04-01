@@ -23,6 +23,7 @@ export interface Outage {
   resolvedAt?: string;
   createdBy: 'system' | 'staff' | 'citizen' | 'eeu_crawler';
   verifiedByStaff: boolean;
+  weather?: { condition: string; rain: number; wind: number; severity: number; };
 }
 
 export interface FeedItem {

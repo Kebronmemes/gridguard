@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { getRealWeather } from '@/lib/predictor';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -88,21 +89,17 @@ export async function GET() {
         outLng += (Math.random() - 0.5) * 0.04;
       }
 
+      // Fetch live weather for these coordinates
+      const weather = await getRealWeather(outLat, outLng);
+
       return {
         id: o.id,
         area: o.area && o.area !== o.district ? o.area : o.district,
-        district: o.subcity || o.district,
         coordinates: [outLat, outLng],
-        type: o.type || 'planned',
-        severity: o.severity || 'moderate',
-        status: 'active',
-        reason: o.cause || 'EEU Power Interruption',
-        reportCount: o.affected_count || 0,
         startTime: o.start_time,
         estimatedRestoreTime,
         etaLabel,
-        createdBy: 'system',
-        verifiedByStaff: true,
+        weather
       };
     }));
 
