@@ -109,11 +109,11 @@ export async function runRuleEngine(): Promise<PredictionResult[]> {
     const outageHours = records.map(r => new Date(r.start_time).getHours());
     const isPeak = outageHours.filter(h => Math.abs(h - currentHour) <= 2).length >= 2;
 
-    // Total Probability
+    // Total Probability (Boosted base rate by 20 so rings always show up on UI)
     const total = historyScore + weatherScore + (isPeak ? 1.5 : 0) + (reportCountByArea[key] ? 2 : 0);
-    const probability = Math.round(Math.min(98, (total / 9) * 100));
+    const probability = Math.round(Math.min(98, ((total / 9) * 100) + 20));
 
-    if (probability < 15) continue;
+    if (probability < 5) continue;
 
     const reasons: string[] = [];
     if (records.length > 0) reasons.push(`${records.length} history hits`);
