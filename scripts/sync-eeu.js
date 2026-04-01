@@ -193,9 +193,7 @@ ${chunks[i]}`;
     const { error: insertErr } = await supabase.from('district_history').insert({
       district: finalDistrict,
       subcity: finalSubcity,
-      area: item.area || finalDistrict,
       cause: item.reason || 'Planned Maintenance',
-      reason: item.reason || 'Planned Maintenance',
       start_time: item.start_time || new Date().toISOString(),
       end_time: item.end_time || null,
       type: 'planned',
