@@ -2,23 +2,29 @@ name: ⚡ GridGuard Master Engine
 
 on:
   schedule:
-    - cron: '*/30 * * * *'   # sync runs every 30 min
-    - cron: '0 * * * *'      # predict runs every hour
-    - cron: '0 */6 * * *'    # ai-predict runs every 6 hours
-    - cron: '0 0 1 */4 *'    # map-districts runs every 4 months
-  workflow_dispatch:          # Manual trigger — runs ALL jobs
+    - cron: '*/30 * * * *'   # sync every 30 min
+    - cron: '0 * * * *'      # hourly jobs
+    - cron: '0 */6 * * *'    # AI jobs
+    - cron: '0 0 1 */4 *'    # mapping
+  workflow_dispatch:
 
 jobs:
-  # ── Step 1: Scrape EEU website & save to Supabase ──
+
+  # ── Step 1: Sync ALWAYS runs (safe + independent) ──
+
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
-    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/30 * * * *'
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'npm' }
+        with:
+          node-version: '20'
+          cache: 'npm'
+
       - run: npm install node-fetch dotenv @supabase/supabase-js
+
       - name: 🚀 Sync EEU Data
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -26,41 +32,49 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/sync-eeu.js
 
-  # ── Step 2: Rule-based predictions (runs after sync completes) ──
+  # ── Step 2: Rule-based predictions (hourly) ──
+
   predict:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     needs: sync
-    if: always() && (github.event_name == 'workflow_dispatch' || github.event.schedule == '0 * * * *')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.schedule, '0 *')
     steps:
       - name: 🔮 Trigger Rule Engine
         run: |
           curl -f -X GET "https://gridguard-eight.vercel.app/api/cron/predictions?ai=false" \
           -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
-  # ── Step 3: AI-enhanced predictions (runs after sync completes) ──
+  # ── Step 3: AI-enhanced predictions (every 6 hours) ──
+
   ai-predict:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     needs: sync
-    if: always() && (github.event_name == 'workflow_dispatch' || github.event.schedule == '0 */6 * * *')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.schedule, '0 */6')
     steps:
       - name: 🤖 Trigger AI Enhancement
         run: |
           curl -f -X GET "https://gridguard-eight.vercel.app/api/cron/predictions?ai=true" \
           -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
-  # ── Step 4: District mapping (runs after sync completes) ──
+  # ── Step 4: District mapping (rare job) ──
+
   map-districts:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     needs: sync
-    if: always() && (github.event_name == 'workflow_dispatch' || github.event.schedule == '0 0 1 */4 *')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.schedule, '0 0 1')
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'npm' }
+        with:
+          node-version: '20'
+          cache: 'npm'
+
       - run: npm install node-fetch dotenv @supabase/supabase-js
+
       - name: 🗺️ Map Addis Neighborhoods
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

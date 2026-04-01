@@ -1,7 +1,7 @@
 // ============================================
 // GridGuard — Production Sync Script (GitHub)
 // ============================================
-// Optimized for speed: larger chunks, minimal delays, global timeout.
+// Based on test-sync-speed.js pattern + Supabase insertion.
 
 import dotenv from 'dotenv';
 import path from 'path';
@@ -19,13 +19,6 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const EEU_URL = 'https://www.eeu.gov.et/power-interruption?lang=en';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Global timeout — kill the process after 5 minutes no matter what
-const GLOBAL_TIMEOUT_MS = 5 * 60 * 1000;
-setTimeout(() => {
-  console.error('⏰ Global timeout reached (5 min). Exiting.');
-  process.exit(1);
-}, GLOBAL_TIMEOUT_MS).unref();
-
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error('❌ Missing Supabase credentials');
   process.exit(1);
@@ -33,7 +26,6 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ⚡ Reliability-first models
 const AI_MODELS = [
   'stepfun/step-3.5-flash:free',
   'openrouter/free',
@@ -62,64 +54,51 @@ const ETHIOPIAN_AREAS = [
 function matchDistrict(name) {
   if (!name) return null;
   const n = name.toLowerCase().trim();
-  return ETHIOPIAN_AREAS.find(a => 
+  return ETHIOPIAN_AREAS.find(a =>
     a.area.toLowerCase().includes(n) || n.includes(a.area.toLowerCase())
   );
 }
 
-async function callAI(prompt) {
-  const startIdx = Math.floor(Math.random() * AI_MODELS.length);
-  for (let m = 0; m < AI_MODELS.length; m++) {
-    const model = AI_MODELS[(startIdx + m) % AI_MODELS.length];
-    try {
-      console.log(`🤖 AI: Trying ${model}...`);
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000); // 30s per-request timeout
-      
-      const res = await fetch(OPENROUTER_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-          'HTTP-Referer': 'https://gridguard-eight.vercel.app',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.1,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
+async function callAI(prompt, modelIndex) {
+  const model = AI_MODELS[modelIndex % AI_MODELS.length];
+  try {
+    console.log(`🤖 AI: Using ${model}...`);
+    const res = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'HTTP-Referer': 'https://gridguard-eight.vercel.app',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+      }),
+    });
 
-      if (res.status === 429) {
-        console.log(`⚠️ Throttled (429). Waiting 5s then trying next model...`);
-        await new Promise(r => setTimeout(r, 5000));
-        continue;
-      }
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content?.trim();
-      if (content) return content;
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        console.error('❌ AI request timed out (30s), trying next model...');
-      } else {
-        console.error('❌ AI attempt failed:', err.message);
-      }
+    if (res.status === 429) {
+      console.log(`⚠️ Throttled (429) on ${model}. Waiting 30s backoff...`);
+      await new Promise(r => setTimeout(r, 30000));
+      return null;
     }
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content?.trim();
+  } catch (err) {
+    console.error(`❌ AI failed (${model}):`, err.message);
+    return null;
   }
-  return null;
 }
 
 async function main() {
-  const t0 = Date.now();
+  const startTime = Date.now();
   console.log('=== GridGuard Production Sync Start ===');
 
   // 1. Fetch
   const html = await (await fetch(EEU_URL)).text();
   console.log(`📡 Fetched ${html.length} chars of HTML`);
 
-  // 2. Clear Targeted Extraction
+  // 2. Extraction
   let text = '';
   const match = html.match(/data-page="([^"]+)"/);
   if (match) {
@@ -134,108 +113,84 @@ async function main() {
     } catch { }
   }
   if (!text) text = html;
-  
-  // Filter for Amharic + Numbers
+
   text = text.match(/[\u1200-\u137F0-9\s:/-]+/g)?.join(' ').replace(/\s+/g, ' ').trim() || '';
   console.log(`🧹 Extracted ${text.length} chars of data`);
 
-  if (!text || text.length < 10) {
-    console.log('❌ No meaningful text extracted. Exiting.');
-    return;
-  }
-
-  // 3. Larger chunks = fewer AI calls = way faster
-  const CHUNK_SIZE = 4000;
+  // 3. Chunking (1500ch)
+  const CHUNK_SIZE = 1500;
   const chunks = [];
   for (let i = 0; i < text.length; i += CHUNK_SIZE) {
     chunks.push(text.substring(i, i + CHUNK_SIZE));
   }
-  console.log(`📦 Sliced into ${chunks.length} chunks (${CHUNK_SIZE}ch each)`);
+  console.log(`📦 Sliced into ${chunks.length} chunks`);
 
-  // 4. Extraction — minimal delays between chunks
-  const rawResults = [];
+  // 4. Sequential Extraction
+  console.log(`\n🧵 Processing ${chunks.length} chunks sequentially...`);
   const today = new Date().toISOString().split('T')[0];
+  const allOutages = [];
 
   for (let i = 0; i < chunks.length; i++) {
-    console.log(`\n--- Chunk ${i + 1}/${chunks.length} ---`);
+    console.log(`--- Chunk ${i + 1}/${chunks.length} ---`);
     const prompt = `
 Extract power outages from this Amharic text.
-ALWAYS translate "reason" to English (e.g., "maintenance", "system failure", "accident").
-Map districts to correct subcities if possible.
+Output ONLY a JSON array.
 Today is ${today}. 
 
-Output ONLY a JSON array in this format:
-[{"districts":["Bole"],"area":"Bole","start_time":"2026-03-19T07:30:00Z","end_time":"2026-03-19T17:30:00Z","reason":"Planned Maintenance"}]
+JSON Format:
+[{"districts":["Bole"],"area":"Bole","start_time":"2026-03-19T07:30:00Z","end_time":"2026-03-19T17:30:00Z","reason":"Planned Maintenance","severity":"moderate"}]
 
 Text:
-${chunks[i]}
-`;
+${chunks[i]}`;
 
-    const res = await callAI(prompt);
+    const res = await callAI(prompt, i);
+
     if (res) {
+      console.log(`\n📄 RAW AI RESPONSE (Chunk ${i+1}):\n${res}\n`);
       try {
         const cleaned = res.replace(/```json/gi, '').replace(/```/g, '').trim();
         const s = cleaned.indexOf('['), e = cleaned.lastIndexOf(']');
         if (s !== -1 && e !== -1) {
           const arr = JSON.parse(cleaned.substring(s, e + 1));
-          rawResults.push(...arr);
+          allOutages.push(...arr);
+          console.log(`✅ Success: ${arr.length} items extracted.`);
         }
-      } catch (e) { console.error('❌ JSON Parse Error in chunk:', e.message); }
+      } catch (e) {
+        console.error(`❌ Parse failed: ${e.message}`);
+      }
+    } else {
+      console.error(`❌ No response.`);
     }
-    
-    // Short 2s delay between chunks (just enough to avoid burst rate limits)
+
+    // 10s delay between requests to avoid throttling
     if (i < chunks.length - 1) {
-      console.log('⏳ 2s delay...');
-      await new Promise(r => setTimeout(r, 2000));
+      console.log('⏳ Waiting 10s for next request...');
+      await new Promise(r => setTimeout(r, 10000));
     }
   }
 
-  if (rawResults.length === 0) {
-    console.log('❌ No data found.');
+  if (allOutages.length === 0) {
+    console.log('❌ No outage data found.');
     return;
   }
 
-  console.log(`\n✅ Extracted ${rawResults.length} outages from ${chunks.length} chunks`);
+  console.log(`\n✅ Extracted ${allOutages.length} total outages`);
 
-  // 5. Normalization Pass — only for large batches to avoid wasting time
-  let finalOutages = rawResults;
-  if (rawResults.length >= 10) {
-    console.log('\n🧠 Final Normalization & Translation Pass...');
-    const finalPrompt = `
-Translate ALL "reason" fields to clean English. Fix Ethiopian district names.
-Rules:
-- DO NOT remove "reason"
-- DO NOT change dates
-Input Data:
-${JSON.stringify(rawResults.slice(0, 50))}
-Output ONLY JSON array.
-`;
+  // 5. Save to Supabase
+  console.log('\n📝 Saving to Supabase...');
 
-    const finalRes = await callAI(finalPrompt);
-    if (finalRes) {
-      try {
-        const cleaned = finalRes.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const s = cleaned.indexOf('['), e = cleaned.lastIndexOf(']');
-        if (s !== -1 && e !== -1) {
-          finalOutages = JSON.parse(cleaned.substring(s, e + 1));
-        }
-      } catch { }
-    }
-  }
-
-  // 6. Batch insert to Supabase (parallel, not sequential)
-  console.log('\n📝 Saving items to Supabase...');
-  
-  const inserts = finalOutages.map(item => {
+  for (const item of allOutages) {
     const rawDistrict = item.districts?.[0] || 'Unknown';
     const matched = matchDistrict(rawDistrict);
-    
+
     const finalDistrict = matched?.area || rawDistrict;
     const finalSubcity = matched?.subcity || finalDistrict;
     const finalLat = matched?.coords[0] || 9.0;
     const finalLng = matched?.coords[1] || 38.75;
 
-    return {
+    console.log(`   -> Saving: ${finalDistrict} | ${item.reason}`);
+
+    const { error: insertErr } = await supabase.from('district_history').insert({
       district: finalDistrict,
       subcity: finalSubcity,
       area: item.area || finalDistrict,
@@ -244,46 +199,27 @@ Output ONLY JSON array.
       start_time: item.start_time || new Date().toISOString(),
       end_time: item.end_time || null,
       type: 'planned',
-      severity: 'moderate',
+      severity: item.severity || 'moderate',
       lat: finalLat,
       lng: finalLng,
       affected_count: 0
-    };
-  });
+    });
 
-  // Batch insert all at once
-  const { error: insertErr } = await supabase.from('district_history').insert(inserts);
-  if (insertErr) {
-    console.error(`❌ Batch DB Error: ${insertErr.message}`);
-    // Fallback: try one-by-one
-    console.log('🔄 Retrying one-by-one...');
-    for (const row of inserts) {
-      const { error } = await supabase.from('district_history').insert(row);
-      if (error) console.error(`   ❌ ${row.district}: ${error.message}`);
-      else console.log(`   ✅ ${row.district}`);
+    if (insertErr) {
+      console.error(`   ❌ DB Error: ${insertErr.message}`);
+    } else {
+      // Add to feed
+      await supabase.from('system_feed').insert({
+        type: 'grid_update',
+        message: `Planned outage: ${finalDistrict} (${item.reason || 'Maintenance'})`,
+        area: finalDistrict
+      });
+      console.log(`   ✅ Saved: ${finalDistrict}`);
     }
-  } else {
-    console.log(`   ✅ Batch inserted ${inserts.length} records`);
   }
 
-  // Batch insert feed entries
-  const feedEntries = finalOutages.map(item => {
-    const rawDistrict = item.districts?.[0] || 'Unknown';
-    const matched = matchDistrict(rawDistrict);
-    const finalDistrict = matched?.area || rawDistrict;
-    return {
-      type: 'grid_update',
-      message: `Planned outage: ${finalDistrict} (${item.reason || 'Maintenance'})`,
-      area: finalDistrict
-    };
-  });
-
-  const { error: feedErr } = await supabase.from('system_feed').insert(feedEntries);
-  if (feedErr) console.error(`❌ Feed insert error: ${feedErr.message}`);
-  else console.log(`   ✅ Added ${feedEntries.length} feed entries`);
-
-  const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-  console.log(`\n🎉 ALL DONE in ${elapsed}s!`);
+  const duration = (Date.now() - startTime) / 1000;
+  console.log(`\n🎉 ALL DONE in ${duration.toFixed(1)}s!`);
 }
 
 main();
