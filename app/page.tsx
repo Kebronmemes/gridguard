@@ -19,8 +19,57 @@ const staggerContainer = {
 };
 
 export default function Home() {
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+
+  useEffect(() => {
+    const hasPrompted = localStorage.getItem('gridguard_location_prompt');
+    if (!hasPrompted) {
+      setTimeout(() => setShowLocationPrompt(true), 2000);
+    }
+  }, []);
+
+  const handleGrantLocation = () => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: Date.now() };
+        localStorage.setItem('gridguard_last_location', JSON.stringify(loc));
+        localStorage.setItem('gridguard_location_prompt', 'granted');
+        setShowLocationPrompt(false);
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-white overflow-hidden selection:bg-blue-500/30">
+      
+      {/* Location Access Prompt Modal */}
+      {showLocationPrompt && (
+        <div className="fixed bottom-6 left-6 right-6 md:left-auto md:right-8 md:w-[380px] z-[100] bg-slate-900 border border-slate-700 p-6 rounded-3xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-500">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+              <MapPin className="text-blue-400 w-5 h-5" />
+            </div>
+            <h4 className="font-bold">Smart Outage Detection</h4>
+          </div>
+          <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+            Allow location access to enable the <strong>Auto-Report</strong> system. If your neighborhood loses power, our AI will automatically detect the interruption even if you are offline.
+          </p>
+          <div className="flex gap-3">
+            <button 
+              onClick={handleGrantLocation}
+              className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition-colors"
+            >
+              Enable Smart Detection
+            </button>
+            <button 
+              onClick={() => { localStorage.setItem('gridguard_location_prompt', 'dismissed'); setShowLocationPrompt(false); }}
+              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl text-sm font-bold transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/50 transition-all">
@@ -112,6 +161,45 @@ export default function Home() {
                 ))}
               </div>
             </motion.div>
+          </div>
+        </section>
+
+        {/* National Impact Section [NEW] */}
+        <section className="py-24 bg-slate-900 border-y border-slate-800">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+              <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
+                <h2 className="text-3xl md:text-5xl font-bold mb-8">National Economic Impact</h2>
+                <div className="space-y-6 text-slate-400 text-lg leading-relaxed">
+                  <p>
+                    Unreliable power supply costs the Ethiopian economy billions of ETB annually in lost productivity, spoiled goods, and industrial downtime. For small businesses, an outage isn't just an inconvenience—it's a direct threat to their livelihood.
+                  </p>
+                  <p>
+                    GridGuard uses AI to model these losses in real-time. By providing 100% transparency on grid status, we help businesses plan their shifts and the government identify high-priority zones that require immediate infrastructure investment.
+                  </p>
+                </div>
+              </motion.div>
+              <div className="bg-slate-950 border border-slate-800 p-8 rounded-3xl relative overflow-hidden group">
+                <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors" />
+                <div className="relative z-10 space-y-8">
+                  <div>
+                    <span className="text-xs font-black text-blue-500 uppercase tracking-widest">Industry Loss Detection</span>
+                    <h3 className="text-4xl font-bold mt-2">12,500 ETB <span className="text-sm font-normal text-slate-500">/hr per district</span></h3>
+                    <p className="text-sm text-slate-400 mt-2">Calculated economic leakage during peak hours based on SME density.</p>
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="flex-1 p-4 bg-slate-900 rounded-xl border border-slate-800">
+                      <div className="text-red-400 font-bold">18%</div>
+                      <div className="text-[10px] text-slate-500 uppercase">Revenue Leakage</div>
+                    </div>
+                    <div className="flex-1 p-4 bg-slate-900 rounded-xl border border-slate-800">
+                      <div className="text-blue-400 font-bold">4.2h</div>
+                      <div className="text-[10px] text-slate-500 uppercase">Avg. Downtime</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -212,6 +300,34 @@ export default function Home() {
 
         {/* Live Predictions Board */}
         <PredictionBoard />
+
+        {/* Blog Highlights Section [NEW] */}
+        <section className="py-24 bg-slate-950">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="flex justify-between items-end mb-12">
+              <div>
+                <h2 className="text-3xl font-bold">Latest Updates</h2>
+                <p className="text-slate-400 mt-2">Official news and grid maintenance alerts.</p>
+              </div>
+              <Link href="/blog" className="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-2">
+                View All <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[
+                { title: "Bole District Maintenance", date: "April 02, 2026", type: "Alert" },
+                { title: "Grid Stabilization Progress", date: "March 30, 2026", type: "News" },
+                { title: "Safety in Power Outages", date: "March 28, 2026", type: "Guide" }
+              ].map((p, i) => (
+                <Link key={i} href="/blog" className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl hover:bg-slate-800 transition-all group">
+                  <span className="px-2 py-1 bg-blue-500/10 text-blue-400 text-[10px] font-bold rounded uppercase tracking-wider">{p.type}</span>
+                  <h3 className="text-lg font-bold mt-3 group-hover:text-blue-400 transition-colors">{p.title}</h3>
+                  <p className="text-slate-500 text-sm mt-2">{p.date}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
 
       </main>
 

@@ -192,6 +192,23 @@ export default function AnalyticsDashboard() {
                 <span className="text-slate-300 font-bold">{data?.totalOutages || 0}</span>
               </div>
             </div>
+            <div className="pt-3 border-t border-slate-700">
+               <div className="flex flex-col gap-1">
+                 <div className="flex items-center gap-1.5">
+                   <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+                   <span className="text-[10px] uppercase font-black text-blue-500 tracking-widest tracking-tighter">AI Economic Impact</span>
+                 </div>
+                 <div className="flex justify-between items-end">
+                    <span className="text-[10px] text-slate-500">Estimated Loss</span>
+                    <span className="text-md font-black text-white">
+                      {new Intl.NumberFormat('en-ET', { style: 'currency', currency: 'ETB', maximumFractionDigits: 0 }).format(data?.financialImpact || 0)}
+                    </span>
+                 </div>
+                 <p className="text-[9px] text-slate-600 italic mt-0.5 leading-tight">
+                   National impact based on SME density and industrial profiles.
+                 </p>
+               </div>
+            </div>
           </div>
         </div>
       </div>

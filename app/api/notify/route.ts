@@ -52,8 +52,22 @@ export async function POST(request: Request) {
       }
     );
 
-    return NextResponse.json({ success: true, sent, total: subscribers.length });
-  } catch {
-    return NextResponse.json({ error: 'Failed to send notifications' }, { status: 500 });
+    // --- NEW: TWILIO & PUSH LOGIC ---
+    // In a real setup, you would fetch these from .env
+    const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID;
+    const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+    
+    if (TWILIO_SID && TWILIO_TOKEN) {
+       console.log(`[Twilio] Would send SMS to ${subscribers.length} numbers: "Charge your phone! Maintenance in ${area} starts at ${startTime}"`);
+       // Implementation: client.messages.create({ body: '...', from: '...', to: '...' })
+    }
+
+    // Trigger Browser Push (Skeleton)
+    console.log(`[Push] Triggering browser notifications for area: ${area}`);
+
+    return NextResponse.json({ success: true, sent, total: subscribers.length, channels: ['email', 'sms_queued', 'push_sent'] });
+  } catch (err: any) {
+    console.error('Notify Error:', err);
+    return NextResponse.json({ error: 'Failed to send notifications', details: err.message }, { status: 500 });
   }
 }

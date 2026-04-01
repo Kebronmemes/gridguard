@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { MapContainer, TileLayer, Circle, Popup, useMap, LayerGroup } from "react-leaflet";
-import { Zap } from "lucide-react";
+import { MapContainer, TileLayer, Circle, Popup, useMap, LayerGroup, Marker } from "react-leaflet";
+import { Zap, CloudRain, CloudLightning } from "lucide-react";
 import type { Outage } from "@/lib/types";
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const RISK_COLORS: Record<string, string> = {
@@ -98,9 +99,24 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
   const [isMounted, setIsMounted] = useState(false);
   const [outages, setOutages] = useState<Outage[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [infrastructure, setInfrastructure] = useState<any[]>([]);
   const [showPredictions, setShowPredictions] = useState(true);
 
   useEffect(() => { setIsMounted(true); }, []);
+
+  useEffect(() => {
+    fetch('/api/infrastructure').then(r => r.json()).then(d => setInfrastructure(d.infrastructure || []));
+  }, []);
+
+  const getInfraIcon = (type: string) => {
+    if (typeof window === 'undefined') return L.divIcon({});
+    const color = type === 'hospital' ? '#ef4444' : type === 'school' ? '#3b82f6' : '#94a3b8';
+    return L.divIcon({
+      html: `<div style="background: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px ${color}"></div>`,
+      className: 'custom-infra-icon',
+      iconSize: [12, 12],
+    });
+  };
 
   const fetchOutages = useCallback(async () => {
     try {
@@ -136,9 +152,11 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
       const area = o.area?.toLowerCase().replace(/\s+/g, '') || '';
       const district = o.district?.toLowerCase().replace(/\s+/g, '') || '';
       
-      // Filter out only if the detailed area itself is explicitly just "Addis Ababa"
-      const isAddis = area === 'addisababa' || area === 'addisabeaba';
-      if (isAddis) return false;
+      // Strict filter for generic city-wide "Addis Ababa"
+      const isGeneric = area === 'addisababa' || area === 'addisabeba' ||
+                         district === 'addisababa' || district === 'addisabeba';
+                         
+      if (isGeneric) return false;
       
       return true;
     });
@@ -193,153 +211,136 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
         </defs>
       </svg>
 
+      {/* Infrastructure Markers */}
+      {infrastructure.map(infra => (
+        <Marker 
+          key={`infra-${infra.id}`} 
+          position={[infra.lat, infra.lng]} 
+          icon={getInfraIcon(infra.type)}
+        >
+          <Popup className="premium-popup">
+            <div className="text-slate-200">
+               <div className="text-[10px] uppercase font-bold text-slate-500 mb-1">{infra.type}</div>
+               <div className="font-bold text-sm">{infra.name}</div>
+               <div className="text-[10px] text-slate-400 mt-2 italic">Critical Infrastructure Point</div>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+
       {filteredOutages.map(o => {
-        const radiusMap: Record<string, number> = { low: 1000, moderate: 2000, critical: 3500, grid_failure: 6000 };
-        const baseRadius = radiusMap[o.severity] || 2000;
+        const radiusMap: Record<string, number> = { low: 15, moderate: 30, critical: 50, grid_failure: 100 };
+        const baseRadius = radiusMap[o.severity] || 30;
         const color = SEVERITY_COLORS[o.severity] || '#ef4444';
         const gradId = `grad-${o.severity}`;
 
         if (!o.coordinates || !Array.isArray(o.coordinates) || o.coordinates.length < 2) return null;
 
-        const popupContent = (
-          <Popup>
-            <div className="font-sans min-w-[240px] p-4">
-              <div className="flex flex-col gap-1 mb-3 border-b border-slate-700/50 pb-3">
-                <h3 className="font-bold text-white text-xl leading-tight mt-1 pt-2">{o.area}</h3>
-              </div>
-              
-              <div className="space-y-4">
-                {o.weather && o.weather.condition !== 'Unknown' && (
-                  <div className="bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/50 flex gap-3 text-xs shadow-inner">
-                    <div className="flex flex-col border-r border-slate-700 pr-3">
-                      <span className="text-[9px] text-slate-500 uppercase font-bold uppercase tracking-wider">Weather</span>
-                      <span className={`font-semibold ${o.weather.condition.includes('Rain') ? 'text-blue-400' : 'text-slate-300'}`}>{o.weather.condition}</span>
+        return (
+          <Circle 
+            key={o.id}
+            center={o.coordinates as [number, number]} 
+            radius={baseRadius} 
+            pathOptions={{ 
+              fillOpacity: 0.3, 
+              fillColor: `url(#${gradId})`, 
+              color: color, 
+              weight: 0.5, 
+              className: 'radar-slow-blink'
+            }}
+          >
+            <Popup>
+              <div className="font-sans min-w-[240px] p-4">
+                <div className="flex flex-col gap-1 mb-3 border-b border-slate-700/50 pb-3">
+                  <h3 className="font-bold text-white text-xl leading-tight mt-1 pt-2">{o.area}</h3>
+                </div>
+                
+                <div className="space-y-4">
+                  {o.weather && o.weather.condition !== 'Unknown' && (
+                    <div className="bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/50 flex gap-3 text-xs shadow-inner">
+                      <div className="flex flex-col border-r border-slate-700 pr-3">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold uppercase tracking-wider">Weather</span>
+                        <span className={`font-semibold ${o.weather.condition.includes('Rain') ? 'text-blue-400' : 'text-slate-300'}`}>{o.weather.condition}</span>
+                      </div>
+                      <div className="flex flex-col flex-1 pl-1">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold uppercase tracking-wider">Conditions</span>
+                        <span className="text-slate-400">Wind: {o.weather.wind} km/h • Rain: {o.weather.rain} mm</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col flex-1 pl-1">
-                      <span className="text-[9px] text-slate-500 uppercase font-bold uppercase tracking-wider">Conditions</span>
-                      <span className="text-slate-400">Wind: {o.weather.wind} km/h • Rain: {o.weather.rain} mm</span>
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                <div className="space-y-1.5 text-[11px] text-slate-400 bg-slate-900/40 p-2.5 rounded-lg">
-                  <div className="flex justify-between border-b border-slate-800 pb-1.5 mb-1.5">
-                    <span className="uppercase text-[9px] font-bold text-slate-500">Planned Start</span>
-                    <span className="text-slate-300 font-medium">{new Date(o.startTime).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-slate-300">
-                    <span className="uppercase text-[9px] text-slate-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"/> AI Prediction ETA</span>
-                    <span className="text-blue-400">{new Date(o.estimatedRestoreTime).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
+                  <div className="space-y-1.5 text-[11px] text-slate-400 bg-slate-900/40 p-2.5 rounded-lg">
+                    <div className="flex justify-between border-b border-slate-800 pb-1.5 mb-1.5">
+                      <span className="uppercase text-[9px] font-bold text-slate-500">Outage Started</span>
+                      <span className="text-slate-300 font-medium">{new Date(o.startTime).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-slate-300">
+                      <span className="uppercase text-[9px] text-slate-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"/> Est. Resolution (Fix)</span>
+                      <span className="text-blue-400">{new Date(o.estimatedRestoreTime).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </Popup>
-        );
-
-        return (
-          <LayerGroup key={o.id}>
-            {/* 1. Rippling Outer Rings (Dynamic based on severity) */}
-            <Circle 
-              center={o.coordinates as [number, number]} 
-              radius={baseRadius} 
-              pathOptions={{ 
-                fillOpacity: 0.05, 
-                fillColor: color, 
-                color: color, 
-                weight: 1, 
-                dashArray: '5 10',
-                className: `radar-ripple pulse-${o.severity}`
-              }}
-            >
-              {popupContent}
-            </Circle>
-
-            {/* 2. Middle Pulsing Halo */}
-            <Circle 
-              center={o.coordinates as [number, number]} 
-              radius={baseRadius * 0.6} 
-              pathOptions={{ 
-                fillOpacity: 0.15, 
-                fillColor: color, 
-                weight: 0,
-                className: `radar-pulse-${o.severity === 'critical' ? 'fast' : 'slow'} pulse-${o.severity}`
-              }}
-            >
-              {popupContent}
-            </Circle>
-
-            {/* 3. The "Sonar" Sweep Line (SVG overlay simulation) */}
-            <Circle 
-              center={o.coordinates as [number, number]} 
-              radius={baseRadius * 0.8} 
-              pathOptions={{ 
-                fillOpacity: 0, 
-                color: color, 
-                weight: 2, 
-                dashArray: '1 3000', // Creates a single point/line effect
-                className: 'radar-sweep'
-              }}
-            >
-              {popupContent}
-            </Circle>
-            
-            {/* 4. Solid High-Intensity Core */}
-            <Circle 
-              center={o.coordinates as [number, number]} 
-              radius={baseRadius * 0.12} 
-              pathOptions={{ 
-                fillOpacity: 1, 
-                fillColor: `url(#${gradId})`, 
-                weight: 2,
-                color: color
-              }}
-            >
-              {popupContent}
-            </Circle>
-          </LayerGroup>
+            </Popup>
+          </Circle>
         );
       })}
 
       {/* ── PREDICTION RISK LAYER (WEATHER + HISTORY) ────────────────────── */}
-      {/* Cyan/Violet color scheme to differentiate from real outages */}
       {showPredictions && predictions
         .filter(p => p.lat && p.lng)
         .map(p => {
           const rColor = RISK_COLORS[p.risk_level] || '#06b6d4';
-          const rRadius = p.risk_level === 'high' ? 4500 : p.risk_level === 'medium' ? 3000 : 2000;
+          const rRadius = p.risk_level === 'high' ? 2000 : p.risk_level === 'medium' ? 1200 : 800;
+          
+          const isWeatherRisk = p.weather_impact?.toLowerCase().includes('rain') || 
+                              p.weather_impact?.toLowerCase().includes('storm') ||
+                              p.reason_summary?.toLowerCase().includes('weather');
+
+          // Weather Icon Marker
+          const weatherIcon = isWeatherRisk ? L.divIcon({
+            html: `<div class="floating-cloud text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19c.7 0 1.3-.2 1.9-.6a3.5 3.5 0 0 0 1.1-4.8c-.5-.7-1-1.3-1.6-1.8A7 7 0 1 0 5 13.5c0 1.2.4 2.2 1.1 3.1.5.5 1 1 1.6 1.4a3.5 3.5 0 0 0 4.8 1.1c.4-.3.7-.7.9-1.1.2.4.5.8.9 1.1.6.4 1.2.6 1.9.6Z"/><path d="M8 14v4"/><path d="M12 14v6"/><path d="M16 14v4"/></svg>
+                  </div>`,
+            className: 'bg-transparent border-none',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          }) : null;
+
           return (
             <LayerGroup key={`pred-${p.id || p.location}`}>
-              {/* Ghost halo — large, very transparent */}
               <Circle
                 center={[p.lat, p.lng]}
                 radius={rRadius}
                 pathOptions={{
                   fillColor: rColor,
-                  fillOpacity: p.risk_level === 'high' ? 0.15 : 0.08,
+                  fillOpacity: 0.2,
                   color: rColor,
-                  weight: 1.5,
-                  dashArray: '4 8',
-                  className: 'weather-radar-pulse'
+                  weight: 1,
+                  dashArray: '3 6',
+                  className: 'radar-slow-blink'
                 }}
               >
                 <Popup>
                   <div className="font-sans min-w-[240px] p-4">
                     <div className="flex items-center justify-between mb-3 border-b border-slate-700/50 pb-2">
                       <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1" style={{ color: rColor }}>
-                         Weather Risk
+                         {isWeatherRisk ? '⛈ Weather Risk' : '📊 Historical Risk'}
                       </span>
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase" style={{ background: rColor + '22', color: rColor }}>
                         {p.probability || 0}% PROB
                       </span>
                     </div>
-                    <h3 className="font-bold text-white text-lg mb-2">{p.location.replace(' (AI)', '')}</h3>
+                    <h3 className="font-bold text-white text-lg mb-2">{p.location.replace(' (AI)', '').replace(' (AI Analysis)', '')}</h3>
                     
                     <div className="space-y-2">
                       {p.weather_impact && (
-                        <div className="bg-slate-800/80 p-2 rounded-lg border border-slate-700/50">
-                           <p className="text-[9px] text-slate-500 font-bold uppercase mb-0.5">Live Weather Severity</p>
-                           <p className="text-sm font-semibold text-cyan-300">{p.weather_impact}</p>
+                        <div className="bg-slate-800/80 p-2 rounded-lg border border-slate-700/50 flex items-center gap-2">
+                           <CloudRain className="w-4 h-4 text-cyan-400" />
+                           <div>
+                             <p className="text-[9px] text-slate-500 font-bold uppercase mb-0.5">Live Weather Severity</p>
+                             <p className="text-sm font-semibold text-cyan-300">{p.weather_impact}</p>
+                           </div>
                         </div>
                       )}
                       
@@ -356,6 +357,11 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
                   </div>
                 </Popup>
               </Circle>
+
+              {/* Weather Cloud Visual Effect */}
+              {weatherIcon && (
+                <Marker position={[p.lat, p.lng]} icon={weatherIcon} interactive={false} />
+              )}
             </LayerGroup>
           );
         })

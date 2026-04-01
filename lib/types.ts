@@ -90,6 +90,7 @@ export interface AnalyticsData {
   resolvedToday: number;
   averageRestorationMinutes: number;
   gridReliability: number;
+  financialImpact?: number;
   outagesByArea: Record<string, number>;
   outagesBySeverity: Record<OutageSeverity, number>;
   hourlyData: { hour: string; count: number }[];

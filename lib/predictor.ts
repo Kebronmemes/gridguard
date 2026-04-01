@@ -217,29 +217,40 @@ export async function runAIEnhancement(): Promise<void> {
     }
   });
 
-  const topDistricts = Object.entries(statsByDistrict)
+  const { data: dbDistricts } = await supabase.from('districts').select('*');
+
+  const topDistrictsBase = Object.entries(statsByDistrict)
     .sort((a, b) => b[1].count - a[1].count)
-    .slice(0, 5) // Top 5 most active districts
-    .map(([name, s]) => ({
+    .slice(0, 5); // Top 5 most active districts
+
+  const topDistricts = await Promise.all(topDistrictsBase.map(async ([name, s]) => {
+    const matched = dbDistricts?.find(d => d.name.toLowerCase() === name.toLowerCase());
+    let weather = null;
+    if (matched) {
+      weather = await getRealWeather(matched.lat, matched.lng);
+    }
+    return {
       name,
       outages_30d: s.count,
       avg_duration_hrs: s.resolved > 0 ? (s.totalDuration / s.resolved).toFixed(1) : 'Unknown',
       punctuality_score: s.resolved > 0 ? (100 - (s.lateCount / s.resolved * 100)).toFixed(0) + '%' : 'N/A',
-    }));
+      current_weather: weather ? `${weather.condition} (Rain: ${weather.rain}mm, Wind: ${weather.wind}kmh)` : 'Clear'
+    };
+  }));
 
   const prompt = `You are the GridGuard AI Intelligence Engine. Analyze this data from the Ethiopian Electric Utility (EEU):
 TOP DISTRICTS HISTORY: ${JSON.stringify(topDistricts)}
 LATEST RECENT DATA: ${JSON.stringify(history.slice(-15))}
 
 Your task:
-1. Identify the TOP 3 high-risk areas.
+1. Identify the TOP 3 high-risk areas based on historical failure rate AND current incoming weather/storms.
 2. For each, ESTIMATE:
    - Manpower Needs: How many field technicians should be deployed?
-   - Punctuality Risk: Why are they slow/not punctual here? (Research-based reasoning: grid age, terrain, or workload).
+   - Weather Impact & Risk: Analyze the current_weather. If it's raining or high wind, explain exactly how the storm will disrupt the grid here!
    - Detection Insight: What pattern did you find?
 
 Return ONLY a JSON array:
-[{"area": "...", "risk_level": "high|medium", "peak_hours": "HH:00-HH:00", "manpower": "X technicians", "punctuality_reason": "brief explanation", "insight": "pattern detection"}]
+[{"area": "...", "risk_level": "high|medium", "peak_hours": "HH:00-HH:00", "manpower": "X technicians", "punctuality_reason": "Weather impact and reasoning...", "insight": "pattern detection"}]
 
 Output ONLY the raw JSON array. No text.`;
 

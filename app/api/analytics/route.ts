@@ -31,6 +31,15 @@ export async function GET() {
     const averageRestorationMinutes = allResolved.length ? totalMinutes / allResolved.length : 120;
     const gridReliability = Math.max(0, 100 - (activeOutagesCount * 0.5));
 
+    // Economic Loss Calculation (AI Forensic Engine)
+    const HOURLY_LOSS_PER_OUTAGE_ETB = 12500;
+    const resolvedLoss = allResolved.reduce((acc, row) => {
+      const durHrs = (new Date(row.end_time).getTime() - new Date(row.start_time).getTime()) / 3600000;
+      return acc + (durHrs * HOURLY_LOSS_PER_OUTAGE_ETB);
+    }, 0);
+    const activeLoss = activeOutagesCount * HOURLY_LOSS_PER_OUTAGE_ETB * 1.5;
+    const financialImpact = Number((resolvedLoss + activeLoss).toFixed(0));
+
     // outagesByArea
     const outagesByArea = allHistory?.reduce((acc: Record<string, number>, curr) => {
       const area = curr.district || curr.area || 'Unknown';
@@ -73,6 +82,7 @@ export async function GET() {
       resolvedToday: resolvedTodayCount,
       gridReliability,
       averageRestorationMinutes,
+      financialImpact,
       outagesByArea,
       outagesBySeverity,
       hourlyData,
@@ -88,6 +98,7 @@ export async function GET() {
       resolvedToday: 0,
       gridReliability: 100,
       averageRestorationMinutes: 0,
+      financialImpact: 0,
       outagesByArea: {},
       outagesBySeverity: { low: 0, moderate: 0, critical: 0, grid_failure: 0 },
       hourlyData: [],

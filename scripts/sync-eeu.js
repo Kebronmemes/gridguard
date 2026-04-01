@@ -185,6 +185,13 @@ ${chunks[i]}`;
   // 5. Save to Supabase
   console.log('\n📝 Saving to Supabase...');
 
+  // Fetch recent records to avoid duplication
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const { data: existingRecords } = await supabase
+    .from('district_history')
+    .select('district, cause, start_time')
+    .gt('start_time', oneWeekAgo);
+
   for (const item of allOutages) {
     const rawDistrict = item.districts?.[0] || 'Unknown';
     const matched = matchDistrict(rawDistrict);
@@ -193,6 +200,27 @@ ${chunks[i]}`;
     const finalSubcity = matched?.subcity || finalDistrict;
     const finalLat = matched?.coords[0] || 9.0;
     const finalLng = matched?.coords[1] || 38.75;
+
+    // Strict filter for generic city-wide "Addis Ababa"
+    const isGeneric = finalDistrict.toLowerCase().replace(/\s+/g, '') === 'addisababa' || 
+                      finalDistrict.toLowerCase().replace(/\s+/g, '') === 'addisabeba';
+                      
+    if (isGeneric) {
+      console.log(`   ⏭️ Skipped (Generic City): ${finalDistrict}`);
+      continue;
+    }
+
+    // Deduplication Check
+    const isDuplicate = existingRecords?.some(r => 
+      r.district === finalDistrict && 
+      r.cause === (item.reason || 'Planned Maintenance') &&
+      Math.abs(new Date(r.start_time).getTime() - new Date(item.start_time || new Date().toISOString()).getTime()) < 24 * 3600 * 1000 // Within 1 day
+    );
+
+    if (isDuplicate) {
+      console.log(`   ⏭️ Skipped (Already exists): ${finalDistrict} | ${item.reason}`);
+      continue;
+    }
 
     console.log(`   -> Saving: ${finalDistrict} | ${item.reason}`);
 

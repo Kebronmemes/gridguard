@@ -81,42 +81,28 @@
   height: 100%;
   z-index: 0;
 }
-/* Radar Animations */
-@keyframes radar-pulse {
-  0% { transform: scale(0.95); opacity: 0.1; }
-  50% { transform: scale(1.05); opacity: 0.3; }
-  100% { transform: scale(0.95); opacity: 0.1; }
+/* Premium Performance Animations */
+@keyframes radar-slow-blink {
+  0% { opacity: 0.3; transform: scale(0.98); }
+  50% { opacity: 0.6; transform: scale(1.02); }
+  100% { opacity: 0.3; transform: scale(0.98); }
 }
 
-@keyframes sonar-sweep {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+@keyframes floating-cloud {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
 }
 
-@keyframes ripple-pulse {
-  0% { transform: scale(0.1); opacity: 0.8; }
-  100% { transform: scale(1); opacity: 0; }
-}
-
-.radar-pulse-slow {
-  animation: radar-pulse 6s infinite ease-in-out;
+.radar-slow-blink {
+  animation: radar-slow-blink 4s infinite ease-in-out;
   transform-origin: center;
 }
 
-.radar-pulse-fast {
-  animation: radar-pulse 3s infinite ease-in-out;
-  transform-origin: center;
+.floating-cloud {
+  animation: floating-cloud 3s infinite ease-in-out;
 }
 
-.radar-sweep {
-  animation: sonar-sweep 4s linear infinite;
-  transform-origin: center;
-}
-
-.radar-ripple {
-  animation: ripple-pulse 3s infinite cubic-bezier(0.4, 0, 0.2, 1);
-  transform-origin: center;
-}
 
 /* Severity-based pulse speeds */
 .pulse-critical { animation-duration: 1.5s; }
