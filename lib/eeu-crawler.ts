@@ -92,7 +92,9 @@ export async function crawlEEUInterruptions(): Promise<{
         const { error: insertErr } = await supabase.from('district_history').insert({
           district: finalDistrict,
           subcity: matched?.subcity || finalDistrict,
+          area: outage.area || finalDistrict,
           cause: outage.reason || 'EEU Power Interruption',
+          reason: outage.reason || 'EEU Power Interruption',
           start_time: outage.start_time || new Date().toISOString(),
           end_time: outage.end_time || null,
           type: 'planned',

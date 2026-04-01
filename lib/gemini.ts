@@ -52,7 +52,7 @@ async function callAI(prompt: string): Promise<string | null> {
         });
 
         if (response.status === 429) {
-          const waitMs = 20000 * attempt;
+          const waitMs = 30000 * attempt; // 30s, 60s, 90s
           console.warn(`[AI] Rate limited on ${label}. Waiting ${waitMs/1000}s...`);
           await new Promise(r => setTimeout(r, waitMs));
           continue;
@@ -120,6 +120,7 @@ Output ONLY JSON array.`;
  */
 export async function extractOutagesFromText(text: string): Promise<Array<{
   districts: string[];
+  area: string;
   start_time: string;
   end_time: string | null;
   reason: string;
@@ -148,12 +149,12 @@ export async function extractOutagesFromText(text: string): Promise<Array<{
     const chunk = chunks[i];
     console.log(`[AI] Processing chunk ${i + 1}/${chunks.length}...`);
     const prompt = `
-Extract power outages from this Amharic text.
+ Extract power outages from this Amharic text.
 ALWAYS translate "reason" to English (e.g., "maintenance", "system failure", "accident").
 Map areas to: [Bole, Piassa, Merkato, Kazanchis, Sarbet, Megenagna, Ayat, CMC, Akaki Kaliti, Kolfe Keranio, Lideta, Kirkos, Nifas Silk-Lafto, Yeka, Gulele, Arada, Addis Ketema, Bahir Dar, Hawassa, Dire Dawa, Adama, Jimma, Mekelle, Gondar, Dessie, Debre Birhan, Bishoftu, Shashamane, Arba Minch, Woldia, Debre Markos, Sululta, Sebeta, Burayu, Nekemte, Lemi Kura].
 
 Today is ${today}. Output ONLY JSON array:
-[{"districts":["Bole"],"start_time":"2026-03-19T07:30:00Z","end_time":"2026-03-19T17:30:00Z","reason":"Planned Maintenance","severity":"moderate"}]
+[{"districts":["Bole"],"area":"Bole","start_time":"2026-03-19T07:30:00Z","end_time":"2026-03-19T17:30:00Z","reason":"Planned Maintenance","severity":"moderate"}]
 
 Text:
 ${chunk}`;
@@ -179,9 +180,9 @@ ${chunk}`;
       }
     }
 
-    // Baseline wait of 20s between chunks as requested by user
+    // baseline 5s wait strictly to avoid 429 but much faster than 20s
     if (i < chunks.length - 1) {
-      await new Promise(r => setTimeout(r, 20000));
+      await new Promise(r => setTimeout(r, 5000));
     }
   }
 

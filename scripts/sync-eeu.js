@@ -80,8 +80,9 @@ async function callAI(prompt) {
       });
 
       if (res.status === 429) {
-        console.log('⚠️ Throttled (429). Waiting 20s backoff...');
-        await new Promise(r => setTimeout(r, 20000));
+        const waitMs = 30000;
+        console.log(`⚠️ Throttled (429). Waiting ${waitMs/1000}s backoff...`);
+        await new Promise(r => setTimeout(r, waitMs));
         continue;
       }
       const data = await res.json();
@@ -139,7 +140,7 @@ Extract power outages from this Amharic text.
 ALWAYS translate "reason" to English (e.g., "maintenance", "system failure", "accident").
 Map districts to correct subcities if possible.
 Today: ${today}. Output ONLY JSON array:
-[{"districts":["Bole"],"start_time":"2026-03-19T07:30:00Z","end_time":"2026-03-19T17:30:00Z","reason":"Planned Maintenance"}]
+[{"districts":["Bole"],"area":"Bole","start_time":"2026-03-19T07:30:00Z","end_time":"2026-03-19T17:30:00Z","reason":"Planned Maintenance"}]
 Text:
 ${chunks[i]}
 `;
@@ -153,10 +154,10 @@ ${chunks[i]}
           const arr = JSON.parse(cleaned.substring(s, e + 1));
           rawResults.push(...arr);
         }
-      } catch { }
+      } catch (e) { console.error('❌ JSON Parse Error in chunk:', e.message); }
     }
-    // 20s AI cooldown as requested
-    if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 20000));
+    // Baseline 5s wait strictly for stability, but much faster
+    if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 5000));
   }
 
   if (rawResults.length === 0) {
@@ -204,8 +205,10 @@ Output ONLY JSON array.
     const { error: insertErr } = await supabase.from('district_history').insert({
       district: finalDistrict,
       subcity: finalSubcity,
+      area: item.area || finalDistrict,
       cause: item.reason || 'Planned Maintenance',
-      start_time: item.start_time,
+      reason: item.reason || 'Planned Maintenance',
+      start_time: item.start_time || new Date().toISOString(),
       end_time: item.end_time || null,
       type: 'planned',
       severity: 'moderate',
