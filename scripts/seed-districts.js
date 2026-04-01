@@ -65,7 +65,7 @@ Aim for at least 60-80 detailed neighborhood names with accurate approximate coo
     console.log(`✅ AI generated ${districts.length} neighborhoods.`);
     console.log('📤 Saving to Supabase...');
 
-    const { error } = await supabase.from('districts').upsert(districts, { onConflict: 'name,subcity' });
+    const { error } = await supabase.from('districts').upsert(districts, { onConflict: 'name' });
 
     if (error) throw error;
 
