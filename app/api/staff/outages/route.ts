@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { decrypt } from '@/lib/session';
 import { notifyAreaSubscribers } from '@/lib/mailer';
-
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 async function validateToken(authHeader: string | null): Promise<{ valid: boolean; user?: any }> {
   if (!authHeader || !authHeader.startsWith('Bearer ')) return { valid: false };

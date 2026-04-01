@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { decrypt } from '@/lib/session';
 import { RATE_LIMITS, getClientIP } from '@/lib/rate-limit';
-
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 async function validateAdmin(authHeader: string | null): Promise<{ valid: boolean; user?: any }> {
   if (!authHeader || !authHeader.startsWith('Bearer ')) return { valid: false };
@@ -49,11 +49,10 @@ export async function GET(request: Request) {
     return acc;
   }, {}) || {};
 
-  // Build EEU data for the admin page
   const eeuData = (eeuRawData || []).map((row: any) => ({
     id: row.id,
-    subcity: row.subcity || row.area || 'Unknown',
-    district: row.district || '',
+    subcity: row.subcity || row.district || 'Unknown',
+    district: row.area && row.area !== row.district ? row.area : row.district,
     reason: row.reason || 'Scheduled maintenance',
     active: !row.end_time,
     fetchedAt: row.start_time || row.created_at,
