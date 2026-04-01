@@ -30,33 +30,9 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: node scripts/sync-eeu.js
+        run: npx tsx scripts/sync-eeu.js
 
-  # ── Step 2: Rule-based predictions (hourly) ──
 
-  predict:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: sync
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.schedule, '0 *')
-    steps:
-      - name: 🔮 Trigger Rule Engine
-        run: |
-          curl -f -X GET "https://gridguard-eight.vercel.app/api/cron/predictions?ai=false" \
-          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
-
-  # ── Step 3: AI-enhanced predictions (every 6 hours) ──
-
-  ai-predict:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: sync
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.schedule, '0 */6')
-    steps:
-      - name: 🤖 Trigger AI Enhancement
-        run: |
-          curl -f -X GET "https://gridguard-eight.vercel.app/api/cron/predictions?ai=true" \
-          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
   # ── Step 4: District mapping (rare job) ──
 
