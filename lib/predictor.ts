@@ -244,27 +244,59 @@ Return ONLY a JSON array:
 Output ONLY the raw JSON array. No text.`;
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://gridguard-eight.vercel.app',
-      },
-      body: JSON.stringify({
-        model: 'openrouter/free',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-      }),
-    });
+    let aiResponseContent = null;
+    const AI_MODELS = [
+      'stepfun/step-3.5-flash:free',
+      'openrouter/free',
+      'arcee-ai/trinity-large-preview:free',
+      'arcee-ai/trinity-mini:free'
+    ];
+    const startIdx = Math.floor(Math.random() * AI_MODELS.length);
 
-    if (!res.ok) throw new Error(`AI API error: ${res.status}`);
+    for (let m = 0; m < AI_MODELS.length; m++) {
+      const model = AI_MODELS[(startIdx + m) % AI_MODELS.length];
+      try {
+        console.log(`[Predictor] 🤖 AI: Trying ${model}...`);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000); // 15s per model to avoid 60s Vercel limit
 
-    const data = await res.json();
-    const content = data.choices?.[0]?.message?.content?.trim();
-    if (!content) throw new Error('Empty AI response');
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+            'HTTP-Referer': 'https://gridguard-eight.vercel.app',
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.1,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
 
-    const cleaned = content.replace(/```json/gi, '').replace(/```/g, '').trim();
+        if (res.status === 429) {
+          console.log(`[Predictor] ⚠️ ${model} throttled. Switching model instantly...`);
+          continue;
+        }
+
+        if (!res.ok) throw new Error(`AI API error: ${res.status}`);
+
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content?.trim();
+        if (content) {
+          aiResponseContent = content;
+          break; // success
+        }
+      } catch (err) {
+        console.error(`[Predictor] ❌ ${model} failed, searching for next...`);
+      }
+    }
+
+    if (!aiResponseContent) throw new Error('All models failed or timed out');
+
+    const cleaned = aiResponseContent.replace(/```json/gi, '').replace(/```/g, '').trim();
     const s = cleaned.indexOf('[');
     const e = cleaned.lastIndexOf(']');
     if (s === -1 || e === -1) throw new Error('No JSON array in response');
