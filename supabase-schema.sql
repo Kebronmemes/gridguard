@@ -20,6 +20,7 @@ DROP TABLE IF EXISTS subscribers CASCADE;
 DROP TABLE IF EXISTS citizen_reports CASCADE;
 DROP TABLE IF EXISTS system_feed CASCADE;
 DROP TABLE IF EXISTS district_history CASCADE;
+DROP TABLE IF EXISTS districts CASCADE;
 DROP TABLE IF EXISTS staff_users CASCADE;
 
 -- =====================
@@ -158,6 +159,22 @@ ALTER TABLE subscribers       DISABLE ROW LEVEL SECURITY;
 ALTER TABLE staff_users       DISABLE ROW LEVEL SECURITY;
 ALTER TABLE staff_locations   DISABLE ROW LEVEL SECURITY;
 ALTER TABLE blog_content      DISABLE ROW LEVEL SECURITY;
+
+-- =====================
+-- 11. districts
+-- =====================
+-- Stores AI-mapped neighborhoods and their precise coordinates.
+-- Populated by scripts/seed-districts.js
+CREATE TABLE IF NOT EXISTS districts (
+  id          BIGSERIAL PRIMARY KEY,
+  name        TEXT UNIQUE NOT NULL,
+  subcity     TEXT,
+  lat         DOUBLE PRECISION NOT NULL,
+  lng         DOUBLE PRECISION NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_dist_name ON districts (name);
+ALTER TABLE districts DISABLE ROW LEVEL SECURITY;
 
 -- =====================
 -- 8. predictions
