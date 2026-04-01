@@ -23,6 +23,7 @@ jobs:
   # 1. EEU Website Scraper (Every 30 mins)
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'sync' || github.event.schedule == '*/30 * * * *'
     steps:
       - uses: actions/checkout@v4
@@ -39,6 +40,7 @@ jobs:
   # 2. Weather-Aware Predictor (Hourly)
   predict:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'predict' || github.event.schedule == '0 * * * *'
     steps:
       - name: 🔮 Trigger Rule Engine
@@ -49,6 +51,7 @@ jobs:
   # 3. Deep AI Analysis (6 Hours)
   ai-predict:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'ai-predict' || github.event.schedule == '0 */6 * * *'
     steps:
       - name: 🤖 Trigger AI Enhancement
@@ -59,6 +62,7 @@ jobs:
   # 4. AI District Mapper (4 Months)
   map-districts:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'map-districts' || github.event.schedule == '0 0 1 */4 *'
     steps:
       - uses: actions/checkout@v4
