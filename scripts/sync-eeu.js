@@ -59,35 +59,38 @@ function matchDistrict(name) {
   );
 }
 
-async function callAI(prompt, modelIndex) {
-  const model = AI_MODELS[modelIndex % AI_MODELS.length];
-  try {
-    console.log(`🤖 AI: Using ${model}...`);
-    const res = await fetch(OPENROUTER_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'HTTP-Referer': 'https://gridguard-eight.vercel.app',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-      }),
-    });
+async function callAI(prompt) {
+  const startIdx = Math.floor(Math.random() * AI_MODELS.length);
+  for (let m = 0; m < AI_MODELS.length; m++) {
+    const model = AI_MODELS[(startIdx + m) % AI_MODELS.length];
+    try {
+      console.log(`🤖 AI: Trying ${model}...`);
+      const res = await fetch(OPENROUTER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'HTTP-Referer': 'https://gridguard-eight.vercel.app',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.1,
+        }),
+      });
 
-    if (res.status === 429) {
-      console.log(`⚠️ Throttled (429) on ${model}. Waiting 30s backoff...`);
-      await new Promise(r => setTimeout(r, 30000));
-      return null;
+      if (res.status === 429) {
+        console.log(`⚠️ ${model} throttled. Switching model instantly...`);
+        continue; 
+      }
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content?.trim();
+      if (content) return content;
+    } catch (err) {
+      console.error(`❌ ${model} failed, searching for next...`);
     }
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim();
-  } catch (err) {
-    console.error(`❌ AI failed (${model}):`, err.message);
-    return null;
   }
+  return null;
 }
 
 async function main() {
@@ -143,7 +146,7 @@ JSON Format:
 Text:
 ${chunks[i]}`;
 
-    const res = await callAI(prompt, i);
+    const res = await callAI(prompt);
 
     if (res) {
       console.log(`\n📄 RAW AI RESPONSE (Chunk ${i+1}):\n${res}\n`);
@@ -162,10 +165,10 @@ ${chunks[i]}`;
       console.error(`❌ No response.`);
     }
 
-    // 10s delay between requests to avoid throttling
+    // 1s delay between requests (Turbo mode)
     if (i < chunks.length - 1) {
-      console.log('⏳ Waiting 10s for next request...');
-      await new Promise(r => setTimeout(r, 10000));
+      console.log('⏳ 1s delay...');
+      await new Promise(r => setTimeout(r, 1000));
     }
   }
 
