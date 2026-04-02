@@ -61,8 +61,8 @@ export default function StaffPortal() {
   useEffect(() => { fetchData(); const i = setInterval(fetchData, 8000); return () => clearInterval(i); }, [fetchData]);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('staff_token');
-    const savedUser = localStorage.getItem('staff_user');
+    const savedToken = localStorage.getItem('gridguard_token');
+    const savedUser = localStorage.getItem('gridguard_user');
     if (savedToken && savedUser) {
       setToken(savedToken);
       setUser(JSON.parse(savedUser));
