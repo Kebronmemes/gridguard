@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Zap, ShieldAlert, Users, Globe, MapPin, ArrowRight, BarChart3, Clock, CheckCircle, Bell, Activity } from "lucide-react";
