@@ -6,7 +6,7 @@
 
 import { Outage, FeedItem, CitizenReport, Feedback, Subscription, StaffUser } from './types';
 
-// ----- Ethiopian Areas Data (shared reference) -----
+// ----- Ethiopian Areas Data (Addis Ababa neighborhoods only) -----
 export const ETHIOPIAN_AREAS = [
   { area: 'Bole', district: 'Addis Ababa', subcity: 'Bole', coords: [8.9806, 38.7578] as [number, number] },
   { area: 'Piassa', district: 'Addis Ababa', subcity: 'Arada', coords: [9.0300, 38.7469] as [number, number] },
@@ -25,30 +25,14 @@ export const ETHIOPIAN_AREAS = [
   { area: 'Gulele', district: 'Addis Ababa', subcity: 'Gulele', coords: [9.0520, 38.7350] as [number, number] },
   { area: 'Arada', district: 'Addis Ababa', subcity: 'Arada', coords: [9.0350, 38.7450] as [number, number] },
   { area: 'Addis Ketema', district: 'Addis Ababa', subcity: 'Addis Ketema', coords: [9.0150, 38.7350] as [number, number] },
-  { area: 'Bahir Dar', district: 'Amhara', subcity: 'Bahir Dar', coords: [11.5742, 37.3614] as [number, number] },
-  { area: 'Hawassa', district: 'Sidama', subcity: 'Hawassa', coords: [7.0504, 38.4955] as [number, number] },
-  { area: 'Dire Dawa', district: 'Dire Dawa', subcity: 'Dire Dawa', coords: [9.6009, 41.8501] as [number, number] },
-  { area: 'Adama', district: 'Oromia', subcity: 'Adama', coords: [8.5400, 39.2700] as [number, number] },
-  { area: 'Jimma', district: 'Oromia', subcity: 'Jimma', coords: [7.6667, 36.8333] as [number, number] },
-  { area: 'Mekelle', district: 'Tigray', subcity: 'Mekelle', coords: [13.4967, 39.4753] as [number, number] },
-  { area: 'Gondar', district: 'Amhara', subcity: 'Gondar', coords: [12.6030, 37.4521] as [number, number] },
-  { area: 'Dessie', district: 'Amhara', subcity: 'Dessie', coords: [11.1333, 39.6333] as [number, number] },
-  { area: 'Debre Birhan', district: 'Amhara', subcity: 'Debre Birhan', coords: [9.6794, 39.5326] as [number, number] },
-  { area: 'Bishoftu', district: 'Oromia', subcity: 'Bishoftu', coords: [8.7500, 38.9833] as [number, number] },
-  { area: 'Shashamane', district: 'Oromia', subcity: 'Shashamane', coords: [7.2000, 38.5833] as [number, number] },
-  { area: 'Arba Minch', district: 'South Ethiopia', subcity: 'Arba Minch', coords: [6.0333, 37.5500] as [number, number] },
-  { area: 'Woldia', district: 'Amhara', subcity: 'Woldia', coords: [11.8333, 39.6000] as [number, number] },
-  { area: 'Debre Markos', district: 'Amhara', subcity: 'Debre Markos', coords: [10.3333, 37.7167] as [number, number] },
-  { area: 'Sululta', district: 'Oromia', subcity: 'Sululta', coords: [9.1833, 38.7500] as [number, number] },
-  { area: 'Sebeta', district: 'Oromia', subcity: 'Sebeta', coords: [8.9167, 38.6167] as [number, number] },
-  { area: 'Burayu', district: 'Oromia', subcity: 'Burayu', coords: [9.0667, 38.6667] as [number, number] },
-  { area: 'Nekemte', district: 'Oromia', subcity: 'Nekemte', coords: [9.0833, 36.5500] as [number, number] },
-  { area: 'Sheger', district: 'Oromia', subcity: 'Sheger City', coords: [9.0300, 38.7000] as [number, number] },
-  { area: 'Legetafo', district: 'Oromia', subcity: 'Legetafo', coords: [9.0900, 38.8900] as [number, number] },
-  { area: 'Tafo', district: 'Oromia', subcity: 'Legetafo', coords: [9.0900, 38.8900] as [number, number] },
-  { area: 'Sendafa', district: 'Oromia', subcity: 'Sendafa', coords: [9.1500, 39.0300] as [number, number] },
+  { area: 'Lemi Kura', district: 'Addis Ababa', subcity: 'Lemi Kura', coords: [9.0100, 38.8300] as [number, number] },
   { area: 'Jomo', district: 'Addis Ababa', subcity: 'Nifas Silk-Lafto', coords: [8.9600, 38.7000] as [number, number] },
+  { area: 'Lebu', district: 'Addis Ababa', subcity: 'Nifas Silk-Lafto', coords: [8.9500, 38.7200] as [number, number] },
   { area: 'Atlas', district: 'Addis Ababa', subcity: 'Bole', coords: [9.0180, 38.7830] as [number, number] },
+  { area: 'Gotera', district: 'Addis Ababa', subcity: 'Kirkos', coords: [8.9900, 38.7600] as [number, number] },
+  { area: 'Gerji', district: 'Addis Ababa', subcity: 'Bole', coords: [9.0000, 38.8000] as [number, number] },
+  { area: 'Bulbula', district: 'Addis Ababa', subcity: 'Bole', coords: [8.9700, 38.7800] as [number, number] },
+  { area: 'Summit', district: 'Addis Ababa', subcity: 'Bole', coords: [9.0200, 38.8500] as [number, number] },
 ];
 
 // ----- Find nearest area from coordinates -----

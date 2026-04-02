@@ -240,45 +240,57 @@ export default function InteractiveMap({ flyTo }: { flyTo?: [number, number] | n
           <Circle 
             key={o.id}
             center={o.coordinates as [number, number]} 
-            radius={baseRadius} 
+            radius={baseRadius * 15} // Increase radius for "vicinity" effect
             pathOptions={{ 
-              fillOpacity: 0.3, 
+              fillOpacity: 0.15, 
               fillColor: `url(#${gradId})`, 
               color: color, 
-              weight: 0.5, 
-              className: 'radar-slow-blink'
+              weight: 1, 
+              className: 'radar-pulse-effect'
             }}
           >
-            <Popup>
-              <div className="font-sans min-w-[240px] p-4">
-                <div className="flex flex-col gap-1 mb-3 border-b border-slate-700/50 pb-3">
-                  <h3 className="font-bold text-white text-xl leading-tight mt-1 pt-2">{o.area}</h3>
+            <Popup className="premium-popup">
+              <div className="font-sans min-w-[260px] p-0 overflow-hidden">
+                <div className="bg-slate-900/90 p-4 border-b border-slate-700/50">
+                  <div className="flex items-center justify-between mb-1">
+                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Addis Ababa Outage</span>
+                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-${o.severity === 'critical' ? 'red' : 'amber'}-500/10 text-${o.severity === 'critical' ? 'red' : 'amber'}-400`}>
+                       {o.severity}
+                     </span>
+                  </div>
+                  <h3 className="font-bold text-white text-xl leading-tight">{o.area}</h3>
+                  <p className="text-xs text-slate-400 mt-1">{o.reason || 'Planned Maintenance'}</p>
                 </div>
                 
-                <div className="space-y-4">
-                  {o.weather && o.weather.condition !== 'Unknown' && (
-                    <div className="bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/50 flex gap-3 text-xs shadow-inner">
-                      <div className="flex flex-col border-r border-slate-700 pr-3">
-                        <span className="text-[9px] text-slate-500 uppercase font-bold uppercase tracking-wider">Weather</span>
-                        <span className={`font-semibold ${o.weather.condition.includes('Rain') ? 'text-blue-400' : 'text-slate-300'}`}>{o.weather.condition}</span>
-                      </div>
-                      <div className="flex flex-col flex-1 pl-1">
-                        <span className="text-[9px] text-slate-500 uppercase font-bold uppercase tracking-wider">Conditions</span>
-                        <span className="text-slate-400">Wind: {o.weather.wind} km/h • Rain: {o.weather.rain} mm</span>
+                <div className="p-4 space-y-4 bg-slate-900/40">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Start Time</span>
+                      <div className="text-slate-200 text-xs font-medium">
+                        {new Date(o.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        <div className="text-[10px] text-slate-500">{new Date(o.startTime).toLocaleDateString([], { day: 'numeric', month: 'short' })}</div>
                       </div>
                     </div>
-                  )}
-
-                  <div className="space-y-1.5 text-[11px] text-slate-400 bg-slate-900/40 p-2.5 rounded-lg">
-                    <div className="flex justify-between border-b border-slate-800 pb-1.5 mb-1.5">
-                      <span className="uppercase text-[9px] font-bold text-slate-500">Outage Started</span>
-                      <span className="text-slate-300 font-medium">{new Date(o.startTime).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
-                    </div>
-                    <div className="flex justify-between font-bold text-slate-300">
-                      <span className="uppercase text-[9px] text-slate-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"/> Est. Resolution (Fix)</span>
-                      <span className="text-blue-400">{new Date(o.estimatedRestoreTime).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
+                    <div className="space-y-1">
+                      <span className="text-[9px] text-blue-500 uppercase font-bold tracking-wider flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"/> End Time
+                      </span>
+                      <div className="text-blue-400 text-xs font-medium">
+                        {o.estimatedRestoreTime ? new Date(o.estimatedRestoreTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD'}
+                        <div className="text-[10px] text-blue-500/70">{o.estimatedRestoreTime ? new Date(o.estimatedRestoreTime).toLocaleDateString([], { day: 'numeric', month: 'short' }) : '--'}</div>
+                      </div>
                     </div>
                   </div>
+
+                  {o.weather && o.weather.condition !== 'Unknown' && (
+                    <div className="bg-slate-800/40 p-2.5 rounded-lg border border-slate-700/30 flex items-center gap-3">
+                       <CloudRain className="w-4 h-4 text-cyan-400" />
+                       <div className="flex-1">
+                         <p className="text-[9px] text-slate-500 font-bold uppercase mb-0.5">Weather Status</p>
+                         <p className="text-[11px] text-slate-300 font-medium">{o.weather.condition} • {o.weather.wind} km/h</p>
+                       </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </Popup>

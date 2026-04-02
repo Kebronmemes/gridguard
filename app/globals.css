@@ -88,14 +88,25 @@
   100% { opacity: 0.3; transform: scale(0.98); }
 }
 
+@keyframes radar-pulse-effect {
+  0% { transform: scale(0.95); opacity: 0.2; }
+  50% { transform: scale(1.05); opacity: 0.5; }
+  100% { transform: scale(0.95); opacity: 0.2; }
+}
+
 @keyframes floating-cloud {
   0% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+  50% { transform: translateY(-5px); }
   100% { transform: translateY(0); }
 }
 
 .radar-slow-blink {
   animation: radar-slow-blink 4s infinite ease-in-out;
+  transform-origin: center;
+}
+
+.radar-pulse-effect {
+  animation: radar-pulse-effect 3s infinite ease-in-out;
   transform-origin: center;
 }
 

@@ -7,9 +7,21 @@ import { PowerOff, CheckCircle, Zap, Bell, Clock, TrendingUp, Phone, Mail } from
 import AnalyticsDashboard from '@/components/Analytics';
 import LocationSearch from '@/components/LocationSearch';
 import OfflineExport from '@/components/OfflineExport';
+import AIAdvisor from '@/components/AIAdvisor';
 import type { Outage, FeedItem, AnalyticsData } from '@/lib/types';
 
 const InteractiveMap = dynamic(() => import('@/components/Map'), { ssr: false });
+
+const VAPID_PUBLIC_KEY = "BIiKNnv5w_8Wr_K29QX5uW3fzwM6yCjTX_Or1aeeq79F24t0DLHDax-Uc3j54Iv_Yhm9pqjQ7AC8KJcSe0gnJLQ";
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
+  return outputArray;
+}
 
 export default function MapPage() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
@@ -25,6 +37,7 @@ export default function MapPage() {
   
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
   const [districtHistory, setDistrictHistory] = useState<any[]>([]);
+  const [pushStatus, setPushStatus] = useState<'default' | 'prompt' | 'granted' | 'error'>('default');
 
   const fetchDistrictData = useCallback(async (district: string) => {
     try {
@@ -108,6 +121,50 @@ export default function MapPage() {
         setSubStatus(`Error: ${data.error || 'Failed'}`);
       }
     } catch { setSubStatus('Error: Connection error'); }
+  };
+
+  const handlePushEnable = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert("Browser push notifications are not supported on this device.");
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        setPushStatus('error');
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+
+      // Parse JSON from subscription
+      const subJSON = JSON.parse(JSON.stringify(subscription));
+
+      const res = await fetch('/api/subscribe/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          subscription: {
+            endpoint: subJSON.endpoint,
+            keys: subJSON.keys
+          }, 
+          area: selectedDistrict || 'General Addis'
+        }),
+      });
+
+      if (res.ok) {
+        setPushStatus('granted');
+        alert(`Notifications enabled for ${selectedDistrict || 'Addis Ababa'}`);
+      }
+    } catch (e) {
+      console.error("Push registration failed", e);
+      setPushStatus('error');
+    }
   };
 
   const feedIcon = (type: string) => {
@@ -237,6 +294,13 @@ export default function MapPage() {
                 </div>
                 
                 <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin space-y-4">
+                  {/* AI Advisor for Selected Area */}
+                  <AIAdvisor 
+                    area={selectedDistrict} 
+                    severity={districtHistory[0]?.severity || 'stable'} 
+                    reason={districtHistory[0]?.reason || 'Normal Grid Op'} 
+                  />
+
                   <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
                     <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Local Outage Reports</p>
                     <div className="flex items-end gap-2">
@@ -244,6 +308,22 @@ export default function MapPage() {
                       <span className="text-sm text-slate-400 mb-1">Total Found</span>
                     </div>
                   </div>
+
+                  <button 
+                    onClick={handlePushEnable}
+                    disabled={pushStatus === 'granted'}
+                    className={`w-full py-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${
+                      pushStatus === 'granted' 
+                        ? 'bg-green-500/10 border-green-500/30 text-green-400 cursor-default' 
+                        : 'bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20'
+                    }`}
+                  >
+                    {pushStatus === 'granted' ? (
+                      <><CheckCircle className="w-3.5 h-3.5" /> Notifications Active</>
+                    ) : (
+                      <><Bell className="w-3.5 h-3.5" /> Enable Browser Alerts for {selectedDistrict}</>
+                    )}
+                  </button>
 
                   <div className="space-y-3">
                     <h4 className="text-xs text-slate-400 font-bold uppercase tracking-widest">Recent Local History</h4>
@@ -334,8 +414,23 @@ export default function MapPage() {
                 <select value={reportForm.area} onChange={e => setReportForm({ ...reportForm, area: e.target.value })}
                   className="mt-1 w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-white focus:border-blue-500 outline-none">
                   <option value="">Select your area...</option>
-                  <optgroup label="Addis Ababa Subcities">
+                  <optgroup label="Addis Ababa Districts">
                     <option value="Bole">Bole</option>
+                    <option value="Piassa">Piassa</option>
+                    <option value="Merkato">Merkato</option>
+                    <option value="Kazanchis">Kazanchis</option>
+                    <option value="Sarbet">Sarbet</option>
+                    <option value="Megenagna">Megenagna</option>
+                    <option value="Ayat">Ayat</option>
+                    <option value="CMC">CMC</option>
+                    <option value="Lebu">Lebu</option>
+                    <option value="Jomo">Jomo</option>
+                    <option value="Gerji">Gerji</option>
+                    <option value="Summit">Summit</option>
+                    <option value="Gotera">Gotera</option>
+                    <option value="Bulbula">Bulbula</option>
+                  </optgroup>
+                  <optgroup label="Sub-cities">
                     <option value="Yeka">Yeka</option>
                     <option value="Arada">Arada</option>
                     <option value="Kirkos">Kirkos</option>
@@ -346,16 +441,6 @@ export default function MapPage() {
                     <option value="Akaki Kaliti">Akaki Kaliti</option>
                     <option value="Addis Ketema">Addis Ketema</option>
                     <option value="Lemi Kura">Lemi Kura</option>
-                  </optgroup>
-                  <optgroup label="Major Cities">
-                    <option value="Adama">Adama</option>
-                    <option value="Bahir Dar">Bahir Dar</option>
-                    <option value="Hawassa">Hawassa</option>
-                    <option value="Dire Dawa">Dire Dawa</option>
-                    <option value="Jimma">Jimma</option>
-                    <option value="Mekelle">Mekelle</option>
-                    <option value="Gondar">Gondar</option>
-                    <option value="Debre Birhan">Debre Birhan</option>
                   </optgroup>
                 </select>
               </div>
@@ -413,6 +498,19 @@ export default function MapPage() {
                   className="mt-1 w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-white focus:border-blue-500 outline-none">
                   <option value="">Select your area...</option>
                   <option value="Bole">Bole</option>
+                  <option value="Piassa">Piassa</option>
+                  <option value="Merkato">Merkato</option>
+                  <option value="Kazanchis">Kazanchis</option>
+                  <option value="Sarbet">Sarbet</option>
+                  <option value="Megenagna">Megenagna</option>
+                  <option value="Ayat">Ayat</option>
+                  <option value="CMC">CMC</option>
+                  <option value="Lebu">Lebu</option>
+                  <option value="Jomo">Jomo</option>
+                  <option value="Gerji">Gerji</option>
+                  <option value="Summit">Summit</option>
+                  <option value="Gotera">Gotera</option>
+                  <option value="Bulbula">Bulbula</option>
                   <option value="Yeka">Yeka</option>
                   <option value="Arada">Arada</option>
                   <option value="Kirkos">Kirkos</option>
@@ -422,20 +520,7 @@ export default function MapPage() {
                   <option value="Nifas Silk-Lafto">Nifas Silk-Lafto</option>
                   <option value="Akaki Kaliti">Akaki Kaliti</option>
                   <option value="Addis Ketema">Addis Ketema</option>
-                  <option value="Piassa">Piassa</option>
-                  <option value="Merkato">Merkato</option>
-                  <option value="Kazanchis">Kazanchis</option>
-                  <option value="Sarbet">Sarbet</option>
-                  <option value="Megenagna">Megenagna</option>
-                  <option value="CMC">CMC</option>
-                  <option value="Ayat">Ayat</option>
-                  <option value="Bahir Dar">Bahir Dar</option>
-                  <option value="Hawassa">Hawassa</option>
-                  <option value="Dire Dawa">Dire Dawa</option>
-                  <option value="Adama">Adama</option>
-                  <option value="Jimma">Jimma</option>
-                  <option value="Mekelle">Mekelle</option>
-                  <option value="Gondar">Gondar</option>
+                  <option value="Lemi Kura">Lemi Kura</option>
                 </select>
               </div>
               {subStatus && <p className="text-sm text-center">{subStatus}</p>}

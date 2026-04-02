@@ -26,7 +26,10 @@ export async function POST(request: Request) {
     });
 
     if (insertErr) {
+      console.error('[Subscribe API] Database error:', insertErr);
       if (insertErr.code === '23505') return NextResponse.json({ error: 'This email is already subscribed' }, { status: 409 });
+      // If error is 42703 (undefined_column), it means the schema is missing phone/preferences
+      if (insertErr.code === '42703') return NextResponse.json({ error: 'Database schema mismatch. Please run the add-subscriber-columns.sql script.' }, { status: 500 });
       throw insertErr;
     }
 
@@ -43,8 +46,9 @@ export async function POST(request: Request) {
       });
     } catch (e) { console.error('Welcome email failed:', e); }
 
-    return NextResponse.json({ success: true, subscription: { email, area, phone: phone ? 'Phone signup currently unavailable' : undefined } }, { status: 201 });
-  } catch (err) {
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+    return NextResponse.json({ success: true, subscription: { email, area } }, { status: 201 });
+  } catch (err: any) {
+    console.error('[Subscribe API] Internal Error:', err);
+    return NextResponse.json({ error: err.message || 'Invalid request' }, { status: 400 });
   }
 }

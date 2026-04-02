@@ -7,9 +7,65 @@
 //   3. Send to AI (OpenRouter) → get English districts, times, reasons
 //   4. Save to Supabase district_history + system_feed
 
-import { extractOutagesFromText } from './gemini';
+import { extractOutagesFromText, researchPlaces } from './gemini';
 import { matchDistrict, type EEUInterruption } from './store';
 import { supabase } from '@/lib/supabase';
+import webpush from 'web-push';
+
+// Configuration for Browser Push Notifications
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    'mailto:support@gridguard-eth.app',
+    VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY
+  );
+}
+
+/**
+ * Notifies browser subscribers for a specific area.
+ */
+async function notifyPushSubscribers(area: string, reason: string, severity: string) {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+  
+  console.log(`[Push] Checking subscribers for ${area}...`);
+  try {
+    const { data: subs, error } = await supabase
+      .from('push_subscriptions')
+      .select('*')
+      .eq('area', area);
+
+    if (error || !subs || subs.length === 0) return;
+
+    console.log(`[Push] Sending ${subs.length} notifications for ${area}`);
+    
+    const payload = JSON.stringify({
+      title: `⚡ Power Alert: ${area}`,
+      body: `Status: ${severity.toUpperCase()}\nReason: ${reason}`,
+      url: '/map',
+      tag: `outage-${area}`
+    });
+
+    const promises = subs.map(s => {
+      const subscription = {
+        endpoint: s.endpoint,
+        keys: { auth: s.auth, p256dh: s.p256dh }
+      };
+      return webpush.sendNotification(subscription, payload).catch((e: any) => {
+        if (e.statusCode === 410 || e.statusCode === 404) {
+          // Clean up expired subscriptions
+          return supabase.from('push_subscriptions').delete().eq('endpoint', s.endpoint);
+        }
+      });
+    });
+
+    await Promise.all(promises);
+  } catch (err) {
+    console.error('[Push] Notify failed:', err);
+  }
+}
 
 const EEU_URL = 'https://www.eeu.gov.et/power-interruption/';
 
@@ -60,15 +116,35 @@ export async function crawlEEUInterruptions(): Promise<{
       return { total: 0, newEntries: 0, errors, interruptions };
     }
 
-    // ── Step 4: Save each outage to Supabase ──
+    // ── Step 4: Research unknown places ──
+    const unknownDistricts = extractedOutages
+      .flatMap(o => o.districts)
+      .filter(d => !matchDistrict(d) && d.length > 3);
+    
+    const researched = unknownDistricts.length > 0 
+      ? await researchPlaces(unknownDistricts) 
+      : {};
+
+    // ── Step 5: Save each outage to Supabase ──
     for (const outage of extractedOutages) {
       for (const district of outage.districts) {
         const matched = matchDistrict(district);
-        if (!matched && district.length < 3) continue;
+        const researchResult = researched[district];
 
-        const finalDistrict = matched?.area || district;
-        const lat = matched?.coords[0] || 9.0;
-        const lng = matched?.coords[1] || 38.75;
+        // Skip if not in Addis
+        if (!matched && (!researchResult || !researchResult.isAddis)) {
+          console.log(`[Crawler] Skipping non-Addis or unverified area: ${district}`);
+          continue;
+        }
+
+        const finalDistrict = researchResult?.englishName || matched?.area || district;
+        const lat = researchResult?.lat || matched?.coords[0] || null;
+        const lng = researchResult?.lng || matched?.coords[1] || null;
+
+        if (!lat || !lng) {
+          console.log(`[Crawler] Skipping ${finalDistrict} - No coordinates found.`);
+          continue;
+        }
 
         // Check for duplicates (same district in last 24h)
         const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -136,6 +212,17 @@ export async function crawlEEUInterruptions(): Promise<{
 
         newEntries++;
         console.log(`[Crawler] ✅ Saved: ${finalDistrict} — ${outage.reason}`);
+
+        // ── TRIGGER PUSH NOTIFICATIONS ──
+        // Only notify if it's a new entry that we just successfully saved
+        console.log(`[Crawler] 📣 Sending push alerts for ${finalDistrict}...`);
+        await notifyPushSubscribers(finalDistrict, outage.reason || 'Outage', outage.severity || 'moderate').catch(e => console.error('[Push] Notify failed for district:', e));
+        
+        // Also notify for subcity (e.g. "Bole") if it's different
+        if (matched?.subcity && matched.subcity !== finalDistrict) {
+          console.log(`[Crawler] 📣 Sending push alerts for subcity ${matched.subcity}...`);
+          await notifyPushSubscribers(matched.subcity, outage.reason || 'Outage', outage.severity || 'moderate').catch(e => console.error('[Push] Notify failed for subcity:', e));
+        }
       }
     }
 

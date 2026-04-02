@@ -83,15 +83,20 @@ async function callAI(prompt: string): Promise<string | null> {
 
 /**
  * Normalizes place names and reasons using a final AI pass.
+ * Ensures EVERYTHING is in English and only within Addis Ababa.
  */
 async function normalizeOutages(outages: any[]): Promise<any[]> {
   if (outages.length === 0) return [];
-  console.log(`[AI] Normalizing ${outages.length} extracted items...`);
+  console.log(`[AI] Normalizing ${outages.length} extracted items (Strict Addis Filter)...`);
 
   const prompt = `
-Fix Ethiopian place names (e.g., "Addis abeba" -> "Addis Ababa", "bole subcity" -> "Bole").
-Translate reasons to clear English if needed. 
-IMPORTANT: DO NOT remove "reason", DO NOT change "start_time" or "end_time".
+Filter and normalize these power outage entries.
+1. ONLY keep entries located in Addis Ababa, Ethiopia. (Discard Bahir Dar, Hawassa, Adama, etc.)
+2. Translate ALL Amharic text to English (area names, sub-cities, reasons).
+3. Fix spelling (e.g., "bole subcity" -> "Bole", "addis abeba" -> "Addis Ababa").
+4. If a place is outside Addis Ababa, REMOVE it from the list.
+5. Standardize reasons: "Maintenance", "Emergency", "System Failure", "Load Shedding".
+
 Output ONLY a JSON array.
 
 Input:
@@ -113,6 +118,40 @@ Output ONLY JSON array.`;
     console.warn('[AI] Normalization parse failed');
   }
   return outages;
+}
+
+/**
+ * AI research tool to geocode and verify unknown places in Addis.
+ */
+export async function researchPlaces(places: string[]): Promise<Record<string, { lat: number, lng: number, englishName: string, isAddis: boolean }>> {
+  if (places.length === 0) return {};
+  console.log(`[AI] Researching ${places.length} unknown places...`);
+
+  const prompt = `
+For each place in this list, determine if it is a neighborhood/district within Addis Ababa, Ethiopia.
+If it is in Addis, provide its approximate GPS coordinates (lat, lng) and its English name.
+If it is NOT in Addis Ababa, set isAddis to false.
+
+List: ${places.join(', ')}
+
+Output ONLY a JSON object mapping the input name to results:
+{"place name": {"lat": 9.x, "lng": 38.x, "englishName": "English Name", "isAddis": true}}
+`;
+
+  const res = await callAI(prompt);
+  if (!res) return {};
+
+  try {
+    const cleaned = res.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const s = cleaned.indexOf('{');
+    const e = cleaned.lastIndexOf('}');
+    if (s !== -1 && e !== -1) {
+      return JSON.parse(cleaned.substring(s, e + 1));
+    }
+  } catch (e) {
+    console.warn('[AI] Place research parse failed');
+  }
+  return {};
 }
 
 /**
@@ -149,12 +188,14 @@ export async function extractOutagesFromText(text: string): Promise<Array<{
     const chunk = chunks[i];
     console.log(`[AI] Processing chunk ${i + 1}/${chunks.length}...`);
     const prompt = `
- Extract power outages from this Amharic text.
-ALWAYS translate "reason" to English (e.g., "maintenance", "system failure", "accident").
-Map areas to: [Bole, Piassa, Merkato, Kazanchis, Sarbet, Megenagna, Ayat, CMC, Akaki Kaliti, Kolfe Keranio, Lideta, Kirkos, Nifas Silk-Lafto, Yeka, Gulele, Arada, Addis Ketema, Bahir Dar, Hawassa, Dire Dawa, Adama, Jimma, Mekelle, Gondar, Dessie, Debre Birhan, Bishoftu, Shashamane, Arba Minch, Woldia, Debre Markos, Sululta, Sebeta, Burayu, Nekemte, Lemi Kura].
+Extract power outages from this Amharic text.
+1. ONLY extract locations within Addis Ababa City.
+2. TRANSLATE ALL Amharic area names and reasons to English.
+3. Map areas to Addis Ababa sub-cities: [Bole, Piassa, Merkato, Kazanchis, Sarbet, Megenagna, Ayat, CMC, Akaki Kaliti, Kolfe Keranio, Lideta, Kirkos, Nifas Silk-Lafto, Yeka, Gulele, Arada, Addis Ketema, Lemi Kura].
+4. DISCARD any locations outside Addis Ababa (e.g., discard Bahir Dar, Jimma, etc.).
 
 Today is ${today}. Output ONLY JSON array:
-[{"districts":["Bole"],"area":"Bole","start_time":"2026-03-19T07:30:00Z","end_time":"2026-03-19T17:30:00Z","reason":"Planned Maintenance","severity":"moderate"}]
+[{"districts":["English Subcity"],"area":"English Neighborhood","start_time":"yyyy-mm-ddThh:mm:ssZ","end_time":"yyyy-mm-ddThh:mm:ssZ","reason":"English Reason","severity":"moderate"}]
 
 Text:
 ${chunk}`;
@@ -201,6 +242,37 @@ ${chunk}`;
 
   // 4. Final Normalization Pass
   return await normalizeOutages(unique);
+}
+
+/**
+ * AI Advisor: Provides actionable, human-centric advice for specific areas.
+ */
+export async function getOutageAdvice(area: string, severity: string, reason: string): Promise<string> {
+  console.log(`[AI] Generating advice for ${area} (${severity})...`);
+  
+  const prompt = `
+Generate brief, actionable, and encouraging advice for residents in ${area}, Addis Ababa, during a ${severity} power outage caused by "${reason}".
+Use a professional yet caring tone.
+Include 3-4 bullet points (max 10 words each) like "Charge power banks" or "Protect sensitive appliances".
+Mention how GridGuard is monitoring the situation.
+Output ONLY text (max 250 characters).`;
+
+  const res = await callAI(prompt);
+  return res || "Stay safe and keep your devices charged. We are monitoring the situation in your area.";
+}
+
+/**
+ * Grid Status Insight: Provides a high-level summary of current grid performance.
+ */
+export async function getGridInsight(analytics: any): Promise<string> {
+  const prompt = `
+Summarize the current grid status in Addis Ababa based on these metrics:
+${JSON.stringify(analytics)}
+Give a 1-sentence "Energy Outlook" for the next 24 hours.
+Be concise and data-driven.`;
+
+  const res = await callAI(prompt);
+  return res || "The grid is stable with minor maintenance in select areas.";
 }
 
 // Legacy exports for compatibility
