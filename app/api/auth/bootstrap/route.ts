@@ -62,23 +62,45 @@ export async function GET() {
        }
     }
 
-    // 4. Ensure mirrored in staff_users table
-    const currentId = userData?.user?.id || (await authAdmin.listUsers()).data.users.find(u => u.email === email)?.id;
-    
-    if (currentId) {
+    // --- STAFF USER BOOTSTRAP ---
+    const staffEmail = 'staff1@gridguard.app';
+    const staffPassword = 'StaffPass123!';
+
+    const { data: staffData, error: staffError } = await authAdmin.createUser({
+      email: staffEmail,
+      password: staffPassword,
+      email_confirm: true,
+      user_metadata: { role: 'field_tech', full_name: 'Test Staff Member' }
+    });
+
+    if (staffError && staffError.message.includes('already exists')) {
+       // Just update metadata
+       const { data: users } = await authAdmin.listUsers();
+       const existing = users?.users.find(u => u.email === staffEmail);
+       if (existing) {
+          await authAdmin.updateUserById(existing.id, {
+             password: staffPassword,
+             user_metadata: { role: 'field_tech', full_name: 'Test Staff' }
+          });
+       }
+    }
+
+    const currentStaffId = staffData?.user?.id || (await authAdmin.listUsers()).data.users.find(u => u.email === staffEmail)?.id;
+    if (currentStaffId) {
       await supabase.from('staff_users').upsert({
-        id: currentId,
-        username: email,
-        name: 'GridGuard Admin',
-        role: 'admin',
-        email: email
+        id: currentStaffId,
+        username: staffEmail,
+        name: 'Test Staff Member',
+        role: 'field_tech',
+        email: staffEmail
       });
     }
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Admin account READY.',
-      credentials: { email, password }
+      message: 'Admin AND Staff accounts are READY.',
+      admin: { email, password },
+      staff: { email: staffEmail, password: staffPassword }
     });
 
   } catch (err: any) {
