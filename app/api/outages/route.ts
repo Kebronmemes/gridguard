@@ -93,9 +93,15 @@ export async function GET() {
       const weather = await getRealWeather(outLat, outLng);
 
       return {
-        id: o.id,
-        area: o.area && o.area !== o.district ? o.area : o.district,
-        coordinates: [outLat, outLng],
+        id: o.id.toString(),
+        area: o.district,
+        district: o.district,
+        subcity: o.subcity || 'Unknown',
+        coordinates: [outLat, outLng] as [number, number],
+        type: (o.type as any) || 'emergency',
+        severity: (o.severity as any) || 'moderate',
+        status: o.end_time ? 'resolved' : 'active',
+        reason: o.cause || 'EEU Power Interruption',
         startTime: o.start_time,
         estimatedRestoreTime,
         etaLabel,

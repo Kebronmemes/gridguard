@@ -11,19 +11,21 @@ export interface Outage {
   id: string;
   area: string;
   district: string;
+  subcity?: string;
   coordinates: [number, number]; // [lat, lng]
-  polygon: [number, number][]; // polygon boundary
+  polygon?: [number, number][]; // polygon boundary
   type: OutageType;
   severity: OutageSeverity;
   status: OutageStatus;
   reason: string;
-  reportCount: number;
+  reportCount?: number;
   startTime: string; // ISO
   estimatedRestoreTime: string; // ISO
   resolvedAt?: string;
-  createdBy: 'system' | 'staff' | 'citizen' | 'eeu_crawler';
-  verifiedByStaff: boolean;
+  createdBy?: 'system' | 'staff' | 'citizen' | 'eeu_crawler';
+  verifiedByStaff?: boolean;
   weather?: { condition: string; rain: number; wind: number; severity: number; };
+  etaLabel?: string;
 }
 
 export interface FeedItem {
