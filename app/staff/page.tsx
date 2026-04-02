@@ -78,13 +78,39 @@ export default function StaffPortal() {
   const handleResolve = async (id: string) => {
     if (!window.confirm("Confirm resolution of this outage?")) return;
     try {
-      const res = await fetch('/api/staff/outages/resolve', {
-        method: 'POST',
+      const res = await fetch('/api/staff/outages', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, status: 'resolved' }),
       });
       if (res.ok) fetchData();
+      else {
+        const d = await res.json();
+        alert(d.error || "Failed to resolve outage");
+      }
     } catch (e) { console.error(e); }
+  };
+
+  const handleVerifyReport = async (id: string) => {
+    try {
+      const res = await fetch('/api/staff/reports/moderate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ reportId: id, action: 'verify' }),
+      });
+      if (res.ok) fetchData();
+    } catch (err) { console.error('Verification failed', err); }
+  };
+
+  const handleDismissReport = async (id: string) => {
+    try {
+      const res = await fetch('/api/staff/reports/moderate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ reportId: id, action: 'dismiss' }),
+      });
+      if (res.ok) fetchData();
+    } catch (err) { console.error('Dismissal failed', err); }
   };
 
   const handleCreate = async () => {
@@ -197,7 +223,7 @@ export default function StaffPortal() {
           {/* MAP VIEW */}
           {activeTab === 'map' && (
             <div className="h-full bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden relative shadow-2xl">
-              <StaffInteractiveMap />
+              <StaffInteractiveMap token={token} onRefresh={fetchData} />
             </div>
           )}
 

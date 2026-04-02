@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldAlert, Users, FileText, MapPin, BarChart3, LogOut, PlusCircle, RefreshCw, Globe, AlertTriangle, Wrench } from "lucide-react";
+import { 
+  ShieldAlert, BarChart3, Users, MapPin, 
+  FileText, Globe, LogOut, RefreshCw, PlusCircle,
+  Zap, CheckCircle, Clock, AlertTriangle, Wrench
+} from "lucide-react";
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -154,22 +158,66 @@ export default function AdminDashboard() {
         <div className="flex-1 p-6 space-y-6">
           {formStatus && <div className="p-3 bg-slate-800/50 border border-slate-700 rounded-xl text-sm text-center">{formStatus}</div>}
 
-          {/* Overview */}
+          {/* Overview Dashboard */}
           {activeTab === "overview" && data?.stats && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {[
-                { label: "Total Staff", value: data.stats.totalStaff, color: "blue" },
-                { label: "Active Outages", value: data.stats.activeOutages, color: "red" },
-                { label: "Total Reports", value: data.stats.totalReports, color: "amber" },
-                { label: "Subscribers", value: data.stats.totalSubscribers, color: "green" },
-                { label: "EEU Interruptions", value: data.stats.eeuInterruptions, color: "purple" },
-                { label: "Content Items", value: data.stats.contentItems, color: "cyan" },
-              ].map(s => (
-                <div key={s.label} className={`bg-slate-800/50 border border-slate-700/50 rounded-xl p-4`}>
-                  <p className="text-xs text-slate-500 uppercase tracking-wider">{s.label}</p>
-                  <p className="text-2xl font-bold text-white mt-1">{s.value}</p>
+            <div className="space-y-6">
+              {/* Premium Strategic Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 bg-gradient-to-br from-red-600/20 to-orange-600/10 border border-red-500/30 rounded-2xl p-6 shadow-xl relative overflow-hidden group">
+                  <div className="absolute -right-4 -top-4 w-32 h-32 bg-red-500/5 rounded-full blur-3xl group-hover:bg-red-500/10 transition-all" />
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-2 mb-2 text-red-400 font-bold uppercase tracking-wider text-xs">
+                      <Zap className="w-4 h-4 fill-current" /> AI National Economic Impact Estimator
+                    </div>
+                    <div className="flex items-end gap-3">
+                      <h2 className="text-4xl font-black text-white tracking-tight">
+                        {data.stats.financialImpact?.toLocaleString()} <span className="text-xl text-slate-500">ETB Loss</span>
+                      </h2>
+                      <div className="mb-1 bg-red-500/20 text-red-400 text-[10px] px-2 py-0.5 rounded-full border border-red-500/30 font-bold uppercase">
+                        CRITICAL Impact
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2 max-w-lg leading-relaxed">
+                      AI-modeled estimation based on business density, industrial energy profiles, and historical SME profit-per-hour data in affected subcities.
+                    </p>
+                  </div>
                 </div>
-              ))}
+
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase font-black tracking-widest mb-1 flex items-center gap-1.5">
+                      <ShieldAlert className="w-3.5 h-3.5 text-blue-500" /> Grid Reliability Index
+                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-4xl font-black text-white">{data.stats.gridReliability}%</span>
+                      <span className="text-[10px] text-green-500 font-bold flex items-center gap-0.5">
+                        <CheckCircle className="w-3 h-3" /> Stabilized
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-slate-800 flex justify-between items-center">
+                    <span className="text-[10px] text-slate-500 uppercase font-bold">Avg Restore Time</span>
+                    <span className="text-sm font-bold text-blue-400">{data.stats.avgRestoreTime} Hours</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* General Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {[
+                  { label: "Active Nodes", value: data.stats.activeOutages, color: "text-red-400", bg: "bg-red-400/5" },
+                  { label: "Resolved (24h)", value: data.stats.resolvedToday, color: "text-green-400", bg: "bg-green-400/5" },
+                  { label: "Total Reports", value: data.stats.totalReports, color: "text-amber-400", bg: "bg-amber-400/5" },
+                  { label: "Subscribers", value: data.stats.totalSubscribers, color: "text-blue-400", bg: "bg-blue-400/5" },
+                  { label: "EEU Logs", value: data.stats.eeuInterruptions, color: "text-purple-400", bg: "bg-purple-400/5" },
+                  { label: "Staff Active", value: data.stats.totalStaff, color: "text-cyan-400", bg: "bg-cyan-400/5" },
+                ].map(s => (
+                  <div key={s.label} className={`bg-slate-900 border border-slate-800 rounded-xl p-4 transition-all hover:border-slate-700`}>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold truncate mb-1">{s.label}</p>
+                    <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
