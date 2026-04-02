@@ -3,112 +3,72 @@ import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * ⚠️ SECRET BOOTSTRAP ROUTE
- * Use this to create your first admin using the OFFICIAL Supabase SDK.
- */
-export async function GET() {
-  // 1. Environment Check
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+async function bootstrapStaff() {
+  const authAdmin = supabase.auth.admin;
+  if (!authAdmin) throw new Error('Supabase Service Role Key is missing on Vercel.');
 
-  if (!url || !key || url.includes('your-supabase-url')) {
-    return NextResponse.json({ 
-      error: 'Environment Variables Missing on Vercel!',
-      diagnostic: {
-        has_url: !!url && !url.includes('your-supabase-url'),
-        has_service_key: !!key && !key.includes('your-supabase-service-key'),
-        tip: 'Go to Vercel Settings > Environment Variables and add NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
-      }
-    }, { status: 500 });
-  }
+  const email = 'staff1@gridguard.app';
+  const password = 'StaffPass123!';
+  const name = 'Test Staff Member';
+  const role = 'field_tech';
 
-  const email = 'admin1@gridguard.app';
-  const password = 'Password123!';
+  console.log(`[Bootstrap] Synchronizing staff: ${email}...`);
 
-  try {
-    // 2. Access Admin API
-    const authAdmin = supabase.auth.admin;
-    if (!authAdmin) {
-      throw new Error('Supabase Client was not initialized with a Service Role Key. Admin actions are unavailable.');
-    }
+  // 1. Try to create the user
+  const { data, error } = await authAdmin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { role, full_name: name }
+  });
 
-    // 3. Create or Update User
-    console.log(`[Bootstrap] Processing admin: ${email}`);
+  let userId = data?.user?.id;
 
-    const { data: userData, error: authError } = await authAdmin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { 
-        role: 'admin', 
-        full_name: 'GridGuard Admin' 
-      }
-    });
-
-    if (authError) {
-       if (authError.message.includes('already exists')) {
-          // If already exists, just update user_metadata to be safe
-          const { data: users } = await authAdmin.listUsers();
-          const existing = users?.users.find(u => u.email === email);
-          if (existing) {
-             await authAdmin.updateUserById(existing.id, {
-                password: password,
-                user_metadata: { role: 'admin', full_name: 'GridGuard Admin' }
-             });
-          }
-       } else {
-          throw authError;
-       }
-    }
-
-    // --- STAFF USER BOOTSTRAP ---
-    const staffEmail = 'staff1@gridguard.app';
-    const staffPassword = 'StaffPass123!';
-
-    const { data: staffData, error: staffError } = await authAdmin.createUser({
-      email: staffEmail,
-      password: staffPassword,
-      email_confirm: true,
-      user_metadata: { role: 'field_tech', full_name: 'Test Staff Member' }
-    });
-
-    if (staffError && staffError.message.includes('already exists')) {
-       // Just update metadata
-       const { data: users } = await authAdmin.listUsers();
-       const existing = users?.users.find(u => u.email === staffEmail);
-       if (existing) {
-          await authAdmin.updateUserById(existing.id, {
-             password: staffPassword,
-             user_metadata: { role: 'field_tech', full_name: 'Test Staff' }
-          });
-       }
-    }
-
-    const currentStaffId = staffData?.user?.id || (await authAdmin.listUsers()).data.users.find(u => u.email === staffEmail)?.id;
-    if (currentStaffId) {
-      await supabase.from('staff_users').upsert({
-        id: currentStaffId,
-        username: staffEmail,
-        name: 'Test Staff Member',
-        role: 'field_tech',
-        email: staffEmail
+  // 2. If already exists, update the password and metadata instead
+  if (error && (error.message.includes('already registered') || error.message.includes('already exists'))) {
+    const { data: users } = await authAdmin.listUsers();
+    const existing = users?.users.find(u => u.email === email);
+    if (existing) {
+      userId = existing.id;
+      await authAdmin.updateUserById(existing.id, {
+        password: password,
+        user_metadata: { role, full_name: name }
       });
     }
+  } else if (error) {
+    throw error;
+  }
 
+  // 3. Ensure record exists in the public.staff_users table
+  if (userId) {
+    const { error: dbError } = await supabase.from('staff_users').upsert({
+      id: userId,
+      username: email,
+      name: name,
+      role: role,
+      email: email
+    });
+    if (dbError) throw new Error(`Database error mirroring staff: ${dbError.message}`);
+  }
+
+  return { email, password };
+}
+
+export async function GET() {
+  try {
+    const creds = await bootstrapStaff();
     return NextResponse.json({ 
       success: true, 
-      message: 'Admin AND Staff accounts are READY.',
-      admin: { email, password },
-      staff: { email: staffEmail, password: staffPassword }
+      message: 'Test Staff account is READY.',
+      credentials: creds,
+      login_url: '/staff/login'
     });
-
   } catch (err: any) {
     console.error('[Bootstrap Error]', err);
     return NextResponse.json({ 
-      error: 'Bootstrap Failed', 
+      error: 'Staff Bootstrap Failed', 
       message: err.message,
-      tip: 'Check your Supabase Service Role Key and Database tables.'
+      tip: 'Check your Vercel Environment Variables and Supabase Tables.'
     }, { status: 500 });
   }
 }
