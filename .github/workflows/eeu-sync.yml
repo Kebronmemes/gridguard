@@ -2,10 +2,7 @@ name: ⚡ GridGuard Master Engine
 
 on:
   schedule:
-    - cron: '*/30 * * * *'   # sync every 30 min
-    - cron: '0 * * * *'      # hourly jobs
-    - cron: '0 */6 * * *'    # AI jobs
-    - cron: '0 0 1 */4 *'    # mapping
+    - cron: '0 * * * *'      # Sync exactly every hour
   workflow_dispatch:
 
 jobs:

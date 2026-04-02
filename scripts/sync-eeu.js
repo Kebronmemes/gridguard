@@ -36,7 +36,7 @@ const AI_MODELS = [
   'arcee-ai/trinity-mini:free'
 ];
 
-// District Mapping Data
+// District Mapping Data (Addis Ababa only)
 const ETHIOPIAN_AREAS = [
   { area: 'Bole', subcity: 'Bole', coords: [8.9806, 38.7578] },
   { area: 'Piassa', subcity: 'Arada', coords: [9.0300, 38.7469] },
@@ -46,19 +46,33 @@ const ETHIOPIAN_AREAS = [
   { area: 'Megenagna', subcity: 'Yeka', coords: [9.0190, 38.7890] },
   { area: 'Ayat', subcity: 'Yeka', coords: [9.0400, 38.8200] },
   { area: 'CMC', subcity: 'Yeka', coords: [9.0280, 38.8030] },
-  { area: 'Bahir Dar', subcity: 'Bahir Dar', coords: [11.5742, 37.3614] },
-  { area: 'Hawassa', subcity: 'Hawassa', coords: [7.0504, 38.4955] },
-  { area: 'Dire Dawa', subcity: 'Dire Dawa', coords: [9.6009, 41.8501] },
-  { area: 'Adama', subcity: 'Adama', coords: [8.5400, 39.2700] },
-  { area: 'Jimma', subcity: 'Jimma', coords: [7.6667, 36.8333] },
-  { area: 'Mekelle', subcity: 'Mekelle', coords: [13.4967, 39.4753] },
+  { area: 'Akaki Kaliti', subcity: 'Akaki Kaliti', coords: [8.8873, 38.7800] },
+  { area: 'Kolfe Keranio', subcity: 'Kolfe Keranio', coords: [9.0050, 38.7100] },
+  { area: 'Lideta', subcity: 'Lideta', coords: [9.0080, 38.7300] },
+  { area: 'Kirkos', subcity: 'Kirkos', coords: [9.0050, 38.7480] },
+  { area: 'Nifas Silk-Lafto', subcity: 'Nifas Silk-Lafto', coords: [8.9700, 38.7400] },
+  { area: 'Yeka', subcity: 'Yeka', coords: [9.0350, 38.8000] },
+  { area: 'Gulele', subcity: 'Gulele', coords: [9.0520, 38.7350] },
+  { area: 'Arada', subcity: 'Arada', coords: [9.0350, 38.7450] },
+  { area: 'Addis Ketema', subcity: 'Addis Ketema', coords: [9.0150, 38.7350] },
+  { area: 'Lemi Kura', subcity: 'Lemi Kura', coords: [9.0100, 38.8300] },
+  { area: 'Jomo', subcity: 'Nifas Silk-Lafto', coords: [8.9600, 38.7000] },
+  { area: 'Lebu', subcity: 'Nifas Silk-Lafto', coords: [8.9500, 38.7200] },
+  { area: 'Atlas', subcity: 'Bole', coords: [9.0180, 38.7830] },
+  { area: 'Gotera', subcity: 'Kirkos', coords: [8.9900, 38.7600] },
+  { area: 'Gerji', subcity: 'Bole', coords: [9.0000, 38.8000] },
+  { area: 'Bulbula', subcity: 'Bole', coords: [8.9700, 38.7800] },
+  { area: 'Summit', subcity: 'Bole', coords: [9.0200, 38.8500] },
 ];
 
 function matchDistrict(name) {
   if (!name) return null;
   const n = name.toLowerCase().trim();
   return ETHIOPIAN_AREAS.find(a =>
-    a.area.toLowerCase().includes(n) || n.includes(a.area.toLowerCase())
+    a.area.toLowerCase().includes(n) || 
+    n.includes(a.area.toLowerCase()) ||
+    a.subcity.toLowerCase().includes(n) ||
+    n.includes(a.subcity.toLowerCase())
   );
 }
 
@@ -140,6 +154,11 @@ async function main() {
     console.log(`--- Chunk ${i + 1}/${chunks.length} ---`);
     const prompt = `
 Extract power outages from this Amharic text.
+1. ONLY extract locations within Addis Ababa City.
+2. TRANSLATE ALL Amharic area names and reasons to English.
+3. Map areas to Addis Ababa sub-cities: [Bole, Piassa, Merkato, Kazanchis, Sarbet, Megenagna, Ayat, CMC, Akaki Kaliti, Kolfe Keranio, Lideta, Kirkos, Nifas Silk-Lafto, Yeka, Gulele, Arada, Addis Ketema, Lemi Kura].
+4. DISCARD any locations outside Addis Ababa (e.g., discard Bahir Dar, Jimma, etc.).
+
 Output ONLY a JSON array.
 Today is ${today}. 
 
@@ -210,15 +229,16 @@ ${chunks[i]}`;
       continue;
     }
 
-    // Deduplication Check
-    const isDuplicate = existingRecords?.some(r => 
-      r.district === finalDistrict && 
-      r.cause === (item.reason || 'Planned Maintenance') &&
-      Math.abs(new Date(r.start_time).getTime() - new Date(item.start_time || new Date().toISOString()).getTime()) < 24 * 3600 * 1000 // Within 1 day
-    );
+    // Deduplication Check (Strict)
+    // Avoid double-inserting the same outage in the same district on the same day
+    const isDuplicate = existingRecords?.some(r => {
+      const sameDistrict = r.district === finalDistrict;
+      const sameTime = Math.abs(new Date(r.start_time).getTime() - new Date(item.start_time || new Date().toISOString()).getTime()) < 24 * 3600 * 1000;
+      return sameDistrict && sameTime;
+    });
 
     if (isDuplicate) {
-      console.log(`   ⏭️ Skipped (Already exists): ${finalDistrict} | ${item.reason}`);
+      console.log(`   ⏭️ Skipped (Existing): ${finalDistrict} | ${item.start_time}`);
       continue;
     }
 
