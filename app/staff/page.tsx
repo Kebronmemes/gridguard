@@ -251,7 +251,7 @@ export default function StaffPortal() {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-slate-400">
                         <Clock className="w-4 h-4 text-blue-400" />
-                        <span>Started: {new Date(o.start_time).toLocaleTimeString()}</span>
+                        <span>Started: {new Date(o.startTime).toLocaleTimeString()}</span>
                       </div>
                     </div>
                     <button 
