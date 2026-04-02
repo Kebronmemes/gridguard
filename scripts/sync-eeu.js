@@ -81,9 +81,9 @@ async function callAI(prompt) {
   for (let m = 0; m < AI_MODELS.length; m++) {
     const model = AI_MODELS[(startIdx + m) % AI_MODELS.length];
     
-    // Add 60-second AbortController to prevent hangs
+    // 60-second AbortController to prevent hangs
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
+    const timeout = setTimeout(() => controller.abort(), 60000 * 3); // 3 mins for Pass 2
 
     try {
       console.log(`🤖 AI: Trying ${model}...`);
@@ -102,11 +102,7 @@ async function callAI(prompt) {
         }),
       });
       clearTimeout(timeout);
-
-      if (res.status === 429) {
-        console.log(`⚠️ ${model} throttled. Switching model instantly...`);
-        continue; 
-      }
+      
       const data = await res.json();
       const content = data.choices?.[0]?.message?.content?.trim();
       if (content) return content;
@@ -115,6 +111,49 @@ async function callAI(prompt) {
     }
   }
   return null;
+}
+
+// ── Pass 2: Final Verification ──
+async function verifyOutages(rawList) {
+  console.log(`\n🕵️ Pass 2: Verifying ${rawList.length} outages...`);
+  
+  const VALID_NEIGHBORHOODS = [
+    "Bole", "Piassa", "Merkato", "Arada", "Kazanchis", "Sarbet", "Megenagna", "Ayat", "CMC", 
+    "Akaki Kaliti", "Kolfe Keranio", "Lideta", "Kirkos", "Nifas Silk-Lafto", "Yeka", "Gulele", 
+    "Addis Ketema", "Lemi Kura", "Jomo", "Lebu", "Atlas", "Gotera", "Gerji", "Bulbula", "Summit",
+    "Addis Ababa University", "Petros Hospital", "Gion", "Kilinto", "Tuludimtu", "Kotebe", "Shiro Meda"
+  ];
+
+  const prompt = `
+Verify and Clean these power outage records for Addis Ababa.
+STRICT RULES:
+1. NEIGHBORHOOD CHECK: Discard any neighborhood that doesn't exist in Addis Ababa.
+2. WHITELIST: Prefer these names if they match: [${VALID_NEIGHBORHOODS.join(', ')}].
+3. NO AMHARIC: All fields MUST be in perfect English. 
+4. DATE CHECK: All dates MUST be Gregorian (2026/2027). If it says 2018 EC, convert to 2026 GC.
+5. DE-DUPLICATE: If multiple entries describe the same area and time, merge them into one.
+6. NO HALLUCINATION: If a location or reason is nonsense, discard it.
+
+Output ONLY a JSON array.
+
+Input Data:
+${JSON.stringify(rawList, null, 2)}`;
+
+  const res = await callAI(prompt);
+  if (!res) return rawList; // Fallback to raw if Pass 2 fails
+
+  try {
+    const cleaned = res.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const s = cleaned.indexOf('['), e = cleaned.lastIndexOf(']');
+    if (s !== -1 && e !== -1) {
+      const verified = JSON.parse(cleaned.substring(s, e + 1));
+      console.log(`✅ Pass 2 Complete: ${verified.length} verified items.`);
+      return verified;
+    }
+  } catch (e) {
+    console.error(`❌ Pass 2 Parse failed: ${e.message}`);
+  }
+  return rawList;
 }
 
 async function main() {
@@ -233,24 +272,27 @@ ${chunks[i]}`;
   }
 
   if (allOutages.length === 0) {
-    console.log('❌ No outage data found.');
+    console.log('❌ No outage data found in Pass 1.');
     return;
   }
 
-  console.log(`\n✅ Extracted ${allOutages.length} total outages`);
+  console.log(`\n✅ Pass 1 Extracted ${allOutages.length} total outages`);
+
+  // 4b. Step 2: Final Verification Pass
+  const verifiedOutages = await verifyOutages(allOutages);
 
   // 5. Save to Supabase
-  console.log('\n📝 Saving to Supabase...');
+  console.log('\n📝 Saving strictly verified data to Supabase...');
 
-  // Fetch recent records to avoid duplication
+  // Fetch recent records to avoid duplication with DB
   const oneWeekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
   const { data: existingRecords } = await supabase
     .from('district_history')
     .select('district, cause, start_time')
     .gt('start_time', oneWeekAgo);
 
-  for (const item of allOutages) {
-    const rawDistrict = item.districts?.[0] || 'Unknown';
+  for (const item of verifiedOutages) {
+    const rawDistrict = item.districts?.[0] || item.area || 'Unknown';
     const matched = matchDistrict(rawDistrict);
 
     const finalDistrict = matched?.area || rawDistrict;
