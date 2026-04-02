@@ -188,14 +188,21 @@ export async function extractOutagesFromText(text: string): Promise<Array<{
     const chunk = chunks[i];
     console.log(`[AI] Processing chunk ${i + 1}/${chunks.length}...`);
     const prompt = `
-Extract power outages from this Amharic text.
-1. ONLY extract locations within Addis Ababa City.
-2. TRANSLATE ALL Amharic area names and reasons to English.
-3. Map areas to Addis Ababa sub-cities: [Bole, Piassa, Merkato, Kazanchis, Sarbet, Megenagna, Ayat, CMC, Akaki Kaliti, Kolfe Keranio, Lideta, Kirkos, Nifas Silk-Lafto, Yeka, Gulele, Arada, Addis Ketema, Lemi Kura].
-4. DISCARD any locations outside Addis Ababa (e.g., discard Bahir Dar, Jimma, etc.).
+Extract power outages from this Amharic text and convert EVERYTHING to English and Gregorian Calendar.
+SOURCE CONTEXT:
+- The dates in the text are in the ETHIOPIAN CALENDAR (EC).
+- You MUST convert these to the GREGORIAN CALENDAR (GC) for the year 2026.
+- (Example: 2018 EC translates to 2026 GC).
 
-Today is ${today}. Output ONLY JSON array:
-[{"districts":["English Subcity"],"area":"English Neighborhood","start_time":"yyyy-mm-ddThh:mm:ssZ","end_time":"yyyy-mm-ddThh:mm:ssZ","reason":"English Reason","severity":"moderate"}]
+STRICT RULES:
+1. ONLY extract locations within Addis Ababa City.
+2. TRANSLATE ALL Amharic area names, sub-cities, and reasons to English.
+3. CONVERT all dates to Gregorian (yyyy-mm-ddThh:mm:ssZ).
+4. Map areas to Addis Ababa sub-cities: [Bole, Piassa, Merkato, Kazanchis, Sarbet, Megenagna, Ayat, CMC, Akaki Kaliti, Kolfe Keranio, Lideta, Kirkos, Nifas Silk-Lafto, Yeka, Gulele, Arada, Addis Ketema, Lemi Kura].
+5. DISCARD any locations outside Addis Ababa (e.g., discard Bahir Dar, Jimma, etc.).
+
+Today (Gregorian) is ${today}. Output ONLY JSON array:
+[{"districts":["Bole"],"area":"Bole","start_time":"yyyy-mm-ddThh:mm:ssZ","end_time":"yyyy-mm-ddThh:mm:ssZ","reason":"Planned Maintenance","severity":"moderate"}]
 
 Text:
 ${chunk}`;

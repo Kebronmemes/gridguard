@@ -80,10 +80,16 @@ async function callAI(prompt) {
   const startIdx = Math.floor(Math.random() * AI_MODELS.length);
   for (let m = 0; m < AI_MODELS.length; m++) {
     const model = AI_MODELS[(startIdx + m) % AI_MODELS.length];
+    
+    // Add 60-second AbortController to prevent hangs
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+
     try {
       console.log(`🤖 AI: Trying ${model}...`);
       const res = await fetch(OPENROUTER_URL, {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
@@ -95,6 +101,7 @@ async function callAI(prompt) {
           temperature: 0.1,
         }),
       });
+      clearTimeout(timeout);
 
       if (res.status === 429) {
         console.log(`⚠️ ${model} throttled. Switching model instantly...`);
@@ -137,8 +144,8 @@ async function main() {
   text = text.match(/[\u1200-\u137F0-9\s:/-]+/g)?.join(' ').replace(/\s+/g, ' ').trim() || '';
   console.log(`🧹 Extracted ${text.length} chars of data`);
 
-  // 3. Chunking (1500ch)
-  const CHUNK_SIZE = 1500;
+  // 3. Chunking (1200ch for better AI focus)
+  const CHUNK_SIZE = 1200;
   const chunks = [];
   for (let i = 0; i < text.length; i += CHUNK_SIZE) {
     chunks.push(text.substring(i, i + CHUNK_SIZE));
@@ -153,17 +160,23 @@ async function main() {
   for (let i = 0; i < chunks.length; i++) {
     console.log(`--- Chunk ${i + 1}/${chunks.length} ---`);
     const prompt = `
-Extract power outages from this Amharic text.
+Extract power outages from this Amharic text and convert EVERYTHING to English and Gregorian Calendar.
+SOURCE CONTEXT:
+- The dates in the text are in the ETHIOPIAN CALENDAR (EC).
+- You MUST convert these to the GREGORIAN CALENDAR (GC) for the year 2026.
+- (Note: 2018 EC corresponds to roughly 2025/2026 GC).
+
+STRICT RULES:
 1. ONLY extract locations within Addis Ababa City.
-2. TRANSLATE ALL Amharic area names and reasons to English.
-3. Map areas to Addis Ababa sub-cities: [Bole, Piassa, Merkato, Kazanchis, Sarbet, Megenagna, Ayat, CMC, Akaki Kaliti, Kolfe Keranio, Lideta, Kirkos, Nifas Silk-Lafto, Yeka, Gulele, Arada, Addis Ketema, Lemi Kura].
-4. DISCARD any locations outside Addis Ababa (e.g., discard Bahir Dar, Jimma, etc.).
+2. TRANSLATE ALL Amharic area names, sub-cities, and reasons to English.
+3. CONVERT all dates to Gregorian (yyyy-mm-ddThh:mm:ssZ).
+4. If you see Amharic characters in your final JSON, you have FAILED.
+5. Output ONLY a valid JSON array. Discard non-Addis entries.
 
-Output ONLY a JSON array.
-Today is ${today}. 
+Today (Gregorian) is ${today}. 
 
-JSON Format:
-[{"districts":["Bole"],"area":"Bole","start_time":"2026-03-19T07:30:00Z","end_time":"2026-03-19T17:30:00Z","reason":"Planned Maintenance","severity":"moderate"}]
+JSON Format Example:
+[{"districts":["Bole"],"area":"Bole (Woreda 03)","start_time":"2026-03-19T07:30:00Z","end_time":"2026-03-19T17:30:00Z","reason":"Planned Grid Maintenance","severity":"moderate"}]
 
 Text:
 ${chunks[i]}`;
@@ -171,19 +184,44 @@ ${chunks[i]}`;
     const res = await callAI(prompt);
 
     if (res) {
-      console.log(`\n📄 RAW AI RESPONSE (Chunk ${i+1}):\n${res}\n`);
+      console.log(`\n📄 AI Response (Chunk ${i+1}):\n${res}\n`);
       try {
         const cleaned = res.replace(/```json/gi, '').replace(/```/g, '').trim();
         const s = cleaned.indexOf('['), e = cleaned.lastIndexOf(']');
         if (s !== -1 && e !== -1) {
           const arr = JSON.parse(cleaned.substring(s, e + 1));
-          allOutages.push(...arr);
-          console.log(`✅ Success: ${arr.length} items extracted.`);
+          
+          // Final Safety: Filter for English only AND enforce 2026 YEAR ONLY
+          const amharicRegex = /[\u1200-\u137F]/;
+          const currentYear = "2026"; // Hard-enforce current year
+
+          const translatedArr = arr.filter(item => {
+            const hasAmharic = amharicRegex.test(item.area || '') || 
+                               amharicRegex.test(item.reason || '') || 
+                               amharicRegex.test(item.districts?.[0] || '');
+            
+            // Check if start_time exists and is explicitly in 2026/2027
+            // This prevents the "weird" 2018 data from appearing.
+            const isStale = !item.start_time || (!item.start_time.includes('2026') && !item.start_time.includes('2027'));
+            
+            if (hasAmharic) {
+              console.log(`   🚨 Blocked: Amharic text detected for ${item.area}`);
+              return false;
+            }
+            if (isStale) {
+              console.log(`   🚨 Blocked: Invalid/Stale year detected: ${item.start_time} for ${item.area}`);
+              return false;
+            }
+            return true;
+          });
+
+          allOutages.push(...translatedArr);
         }
       } catch (e) {
-        console.error(`❌ Parse failed: ${e.message}`);
+        console.error(`❌ JSON Parse failed for chunk ${i+1}: ${e.message}`);
       }
-    } else {
+    }
+ else {
       console.error(`❌ No response.`);
     }
 
@@ -220,7 +258,7 @@ ${chunks[i]}`;
     const finalLat = matched?.coords[0] || 9.0;
     const finalLng = matched?.coords[1] || 38.75;
 
-    // Strict filter for generic city-wide "Addis Ababa"
+    // 1. Strict filter for generic city-wide "Addis Ababa"
     const isGeneric = finalDistrict.toLowerCase().replace(/\s+/g, '') === 'addisababa' || 
                       finalDistrict.toLowerCase().replace(/\s+/g, '') === 'addisabeba';
                       
@@ -229,7 +267,19 @@ ${chunks[i]}`;
       continue;
     }
 
-    // Deduplication Check (Strict)
+    // 2. Amharic Character Filter (Fail-safe)
+    const amharicRegex = /[\u1200-\u137F]/;
+    const isAmharic = amharicRegex.test(finalDistrict) || 
+                      amharicRegex.test(finalSubcity) || 
+                      amharicRegex.test(item.reason || '') ||
+                      amharicRegex.test(item.area || '');
+
+    if (isAmharic) {
+      console.log(`   🚨 Blocked: Amharic text detected for ${finalDistrict}`);
+      continue;
+    }
+
+    // 3. Deduplication Check (Strict)
     // Avoid double-inserting the same outage in the same district on the same day
     const isDuplicate = existingRecords?.some(r => {
       const sameDistrict = r.district === finalDistrict;
@@ -265,7 +315,7 @@ ${chunks[i]}`;
       // Add to feed
       await supabase.from('system_feed').insert({
         type: 'grid_update',
-        message: `Planned outage: ${finalDistrict} (${item.reason || 'Maintenance'})`,
+        message: `Grid Status: Outage in ${finalDistrict} (${item.reason || 'Maintenance'})`,
         area: finalDistrict
       });
       console.log(`   ✅ Saved: ${finalDistrict}`);
