@@ -131,13 +131,26 @@ STRICT RULES:
 2. WHITELIST: Prefer these names if they match: [${VALID_NEIGHBORHOODS.join(', ')}].
 3. NO AMHARIC: All fields MUST be in perfect English. 
 4. DATE CHECK: All dates MUST be Gregorian (2026/2027). If it says 2018 EC, convert to 2026 GC.
-5. DE-DUPLICATE: If multiple entries describe the same area and time, merge them into one.
-6. NO HALLUCINATION: If a location or reason is nonsense, discard it.
+5. GEOCODING: For each entry, provide the most accurate Latitude and Longitude you can identify for that neighborhood in Addis Ababa.
+6. DE-DUPLICATE: If multiple entries describe the same area and time, merge them into one.
+7. NO HALLUCINATION: If a location or reason is nonsense, discard it.
 
 Output ONLY a JSON array.
 
 Input Data:
-${JSON.stringify(rawList, null, 2)}`;
+${JSON.stringify(rawList, null, 2)}
+
+Example Item Record Format:
+{
+  "districts": ["Bole"],
+  "area": "Bole (Woreda 03)",
+  "lat": 8.9806,
+  "lng": 38.7578,
+  "start_time": "2026-03-19T07:30:00Z",
+  "end_time": "2026-03-19T17:30:00Z",
+  "reason": "Planned Maintenance",
+  "severity": "moderate"
+}`;
 
   const res = await callAI(prompt);
   if (!res) return rawList; // Fallback to raw if Pass 2 fails
@@ -297,8 +310,9 @@ ${chunks[i]}`;
 
     const finalDistrict = matched?.area || rawDistrict;
     const finalSubcity = matched?.subcity || finalDistrict;
-    const finalLat = matched?.coords[0] || 9.0;
-    const finalLng = matched?.coords[1] || 38.75;
+    // Select Coordinates: AI-provided > Whitelist > Default Center
+    const finalLat = item.lat || matched?.coords[0] || 9.0;
+    const finalLng = item.lng || matched?.coords[1] || 38.75;
 
     // 1. Strict filter for generic city-wide "Addis Ababa"
     const isGeneric = finalDistrict.toLowerCase().replace(/\s+/g, '') === 'addisababa' || 

@@ -80,13 +80,14 @@ export async function GET() {
         }
       }
 
-      // Add slight variance to unmapped defaults so they don't stack fully invisibly
+      // If we are at the default center, add a tiny aesthetic jitter so markers don't overlap perfectly.
+      // We've reduced this from 4km to ~200m since Pass 2 AI now provides better coordinates.
       let outLat = o.lat || 9.0;
       let outLng = o.lng || 38.75;
       if (outLat === 9.0 && outLng === 38.75) {
-        // Random offset ~4km around the center
-        outLat += (Math.random() - 0.5) * 0.04;
-        outLng += (Math.random() - 0.5) * 0.04;
+        // Small offset ~200m around the center for generic points
+        outLat += (Math.random() - 0.5) * 0.002;
+        outLng += (Math.random() - 0.5) * 0.002;
       }
 
       // Fetch live weather for these coordinates
